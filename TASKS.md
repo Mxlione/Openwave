@@ -231,7 +231,7 @@ Decisions worth recording:
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 55 | ⬜ | Continuous PSD feed | Binary WebSocket frames, server-side decimation |
+| 55 | ✅ | Continuous PSD feed | Binary WebSocket frames at 1 kB each, averaged down server-side rather than decimated — a decimated spectrum misses narrow signals, which on a display looks like a station flickering |
 | 56 | ⬜ | Spectrum display | Canvas/WebGL, dB scale, station markers |
 | 57 | ⬜ | Waterfall | Time cascade with a colour palette |
 | 58 | ⬜ | Performance budget | Throughput and latency measured, regression-tested |

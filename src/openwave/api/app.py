@@ -17,6 +17,7 @@ run time. A new prefix lets both versions be served while clients catch up.
 from __future__ import annotations
 
 import asyncio
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any, Final
@@ -35,6 +36,13 @@ from openwave.api.models import (
     ScanSummary,
 )
 from openwave.api.scans import ScanBusyError, ScanManager, ScanNotFoundError
+from openwave.api.spectrum import (
+    DEFAULT_BINS,
+    DEFAULT_FRAME_RATE,
+    DEFAULT_RANGE_DB,
+    FRAME_HEADER_SIZE,
+    SpectrumStreamer,
+)
 from openwave.api.streams import AudioStreamer, StreamBusyError
 from openwave.media.libvlc import libvlc_version, playback_available
 from openwave.radio.station import Station
@@ -86,6 +94,7 @@ def create_app(
         tuner_factory=open_tuner,
     )
     streamer = AudioStreamer(device_factory=lambda: open_receiver(device_spec))
+    spectrum = SpectrumStreamer(device_factory=lambda: open_receiver(device_spec))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -113,11 +122,12 @@ def create_app(
     )
     app.state.manager = manager
     app.state.streamer = streamer
+    app.state.spectrum = spectrum
     app.state.device_spec = device_spec
     app.state.tuner_spec = tuner_spec
 
     _register_error_handlers(app)
-    _register_routes(app, manager=manager, streamer=streamer)
+    _register_routes(app, manager=manager, streamer=streamer, spectrum=spectrum)
     return app
 
 
@@ -157,7 +167,13 @@ def _register_error_handlers(app: FastAPI) -> None:
         )
 
 
-def _register_routes(app: FastAPI, *, manager: ScanManager, streamer: AudioStreamer) -> None:
+def _register_routes(
+    app: FastAPI,
+    *,
+    manager: ScanManager,
+    streamer: AudioStreamer,
+    spectrum: SpectrumStreamer,
+) -> None:
     """Attach every route to the application."""
 
     @app.get(f"{API_PREFIX}/health", response_model=Capabilities, tags=["system"])
@@ -298,6 +314,64 @@ def _register_routes(app: FastAPI, *, manager: ScanManager, streamer: AudioStrea
         return {
             "frequency_hz": streamer.frequency_hz,
             "listeners": streamer.listener_count,
+        }
+
+    @app.websocket(f"{API_PREFIX}/ws/spectrum")
+    async def spectrum_feed(
+        websocket: WebSocket,
+        freq_hz: float = 98_000_000.0,
+        sample_rate_hz: float = 2_400_000.0,
+        reference_dbfs: float | None = None,
+    ) -> None:
+        """Push a live spectrum as binary frames.
+
+        Each frame carries its own scale, so a client needs no prior agreement about what the
+        bytes mean. See :mod:`openwave.api.spectrum` for the layout.
+
+        The frames are produced in a worker thread, because reading a receiver and taking an
+        FFT is blocking work that would otherwise stall the event loop and every other client
+        with it.
+        """
+        await websocket.accept()
+        loop = asyncio.get_running_loop()
+        stop = threading.Event()
+
+        def produce() -> None:
+            """Read frames in a thread and hand each one to the event loop."""
+            try:
+                for frame in spectrum.frames(
+                    freq_hz,
+                    sample_rate_hz=sample_rate_hz,
+                    reference_dbfs=reference_dbfs,
+                ):
+                    if stop.is_set():
+                        return
+                    asyncio.run_coroutine_threadsafe(websocket.send_bytes(frame), loop).result(
+                        timeout=5.0
+                    )
+            except Exception:  # noqa: BLE001 - the socket closing is the normal ending
+                return
+
+        worker = threading.Thread(target=produce, name="openwave-spectrum", daemon=True)
+        worker.start()
+        try:
+            # Reading is how a disconnect is noticed: nothing is expected from the client.
+            while True:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            stop.set()
+
+    @app.get(f"{API_PREFIX}/spectrum", tags=["streams"])
+    async def spectrum_status() -> dict[str, object]:
+        """How the spectrum feed is configured, and whether anybody is watching."""
+        return {
+            "viewers": spectrum.viewers,
+            "bins": DEFAULT_BINS,
+            "frame_rate": DEFAULT_FRAME_RATE,
+            "range_db": DEFAULT_RANGE_DB,
+            "frame_header_bytes": FRAME_HEADER_SIZE,
         }
 
     @app.websocket(f"{API_PREFIX}/ws/scans/{{scan_id}}")
