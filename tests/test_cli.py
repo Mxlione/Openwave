@@ -9,9 +9,12 @@ no message.
 from __future__ import annotations
 
 import json
+import wave
 from pathlib import Path
 
 import numpy as np
+import pytest
+from scipy.signal import welch
 from typer.testing import CliRunner
 
 from openwave import __version__
@@ -163,6 +166,106 @@ class TestScanFm:
 
     def test_a_receiver_that_cannot_reach_the_band_fails_cleanly(self) -> None:
         result = runner.invoke(app, ["scan", "fm", "--device", "hackrf"])
+        assert result.exit_code == 1
+        assert "no driver called" in " ".join(result.output.split())
+
+
+class TestListen:
+    def test_recording_writes_a_playable_wav_file(self, tmp_path: Path) -> None:
+        # Recording rather than playing, because a test machine has no audio device and the
+        # standard library can check the file independently.
+        destination = tmp_path / "station.wav"
+        result = runner.invoke(
+            app,
+            ["listen", "88.1", "--demo", "--seconds", "0.4", "--record", str(destination)],
+        )
+        assert result.exit_code == 0, result.output
+        assert destination.is_file()
+
+        with wave.open(str(destination)) as reader:
+            assert reader.getnchannels() == 2
+            assert reader.getframerate() == 48_000
+            assert reader.getsampwidth() == 2
+            assert reader.getnframes() == pytest.approx(0.4 * 48_000, rel=0.02)
+
+    def test_the_recorded_audio_is_the_station_that_was_asked_for(self, tmp_path: Path) -> None:
+        # 88.1 MHz in the demonstration band carries 1 kHz on the left and 400 Hz on the right.
+        destination = tmp_path / "station.wav"
+        runner.invoke(
+            app,
+            ["listen", "88.1", "--demo", "--seconds", "0.5", "--record", str(destination)],
+        )
+        with wave.open(str(destination)) as reader:
+            raw = reader.readframes(reader.getnframes())
+            rate = reader.getframerate()
+
+        samples = np.frombuffer(raw, dtype="<i2").astype(np.float64) / 32768.0
+        left, right = samples[0::2], samples[1::2]
+
+        def level_at(channel: np.ndarray, target_hz: float) -> float:
+            freqs, psd = welch(channel, fs=rate, nperseg=min(8192, len(channel)))
+            return float(psd[int(np.argmin(np.abs(freqs - target_hz)))])
+
+        assert level_at(left, 1000.0) > 10 * level_at(left, 400.0)
+        assert level_at(right, 400.0) > 10 * level_at(right, 1000.0)
+
+    def test_it_reports_stereo_in_the_summary(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "listen",
+                "88.1",
+                "--demo",
+                "--seconds",
+                "0.3",
+                "--record",
+                str(tmp_path / "s.wav"),
+            ],
+        )
+        assert "stereo" in " ".join(result.output.split())
+
+    def test_a_frequency_in_hertz_is_understood_as_well_as_megahertz(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "listen",
+                "88100000",
+                "--demo",
+                "--seconds",
+                "0.3",
+                "--record",
+                str(tmp_path / "s.wav"),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "88.100 MHz" in " ".join(result.output.split())
+
+    def test_recording_without_a_duration_is_refused(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app, ["listen", "98.0", "--demo", "--record", str(tmp_path / "s.wav")]
+        )
+        assert result.exit_code == 2
+        assert "needs --seconds" in " ".join(result.output.split())
+
+    def test_a_frequency_outside_the_band_is_flagged_but_attempted(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "listen",
+                "120.0",
+                "--demo",
+                "--seconds",
+                "0.2",
+                "--record",
+                str(tmp_path / "s.wav"),
+            ],
+        )
+        # Recording skips the warning, but the command still has to work: the FM band plan is
+        # not the same everywhere, and a receiver can tune outside it.
+        assert result.exit_code == 0
+
+    def test_an_unknown_driver_fails_cleanly(self) -> None:
+        result = runner.invoke(app, ["listen", "98.0", "--device", "hackrf"])
         assert result.exit_code == 1
         assert "no driver called" in " ".join(result.output.split())
 

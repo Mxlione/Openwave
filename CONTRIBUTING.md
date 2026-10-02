@@ -55,6 +55,15 @@ pip install -e ".[dev,media]"    # libVLC playback
 pip install -e ".[dev,rtlsdr]"   # real RTL-SDR hardware
 ```
 
+The `media` extra installs the Python bindings; libVLC itself comes from your package manager
+(`libvlc-dev` on Debian and Ubuntu, `vlc-devel` on Fedora). With it installed you can hear the
+demodulator work without owning a receiver:
+
+```bash
+openwave scan fm --demo      # scan an invented band
+openwave listen 88.1 --demo  # and listen to one of its stations
+```
+
 `pip install -e ".[dev]"` alone is enough to run the whole test suite, because the tests use the
 simulated receivers.
 
@@ -88,6 +97,9 @@ pytest                  # tests
   a known frequency, assert it is found within a stated tolerance.
 - Tests must pass without any hardware attached. Anything that genuinely needs a receiver is marked
   `@pytest.mark.hardware` and skipped in CI.
+- Playback tests are marked `@pytest.mark.media` and skipped when libVLC is absent. Unlike the
+  SDR drivers, that path *is* verified in CI, which installs libVLC — so a playback change
+  should come with a test that really starts it.
 - Large captures do not belong in git. Generate signals in the test, or add a small fixture under
   `tests/data/`.
 

@@ -75,19 +75,32 @@ estimates the noise floor to within 0.2 dB where the median is 43 dB out.
 | 23 | ✅ | `fm_demodulator` | Quadrature demodulation, decimation, 50 µs de-emphasis |
 | 24 | ✅ | Stereo decoding | 19 kHz pilot, 38 kHz subcarrier, L/R matrixing |
 | 25 | ✅ | Audio chain | Resample to 48 kHz, PCM output |
-| 26 | ⬜ | libVLC integration | `python-vlc` playing a local stream fed by the demodulator |
+| 26 | ✅ | libVLC integration | `python-vlc` pulling a live stream through media callbacks. Verified against real libVLC, which CI installs |
 | 27 | ✅ | Tests | Modulate a 1 kHz tone, demodulate, assert frequency and distortion |
-| 28 | ⬜ 🟢 | CLI `openwave listen 98.0` | Tune and play one frequency |
+| 28 | ✅ | CLI `openwave listen 98.0` | Tune and play one frequency, or `--record` it to a WAV file on a machine with no audio output |
 
-**Where Phase 3 stands.** Demodulation, stereo decoding and the audio chain are done, and the
-stereo flag in a scan comes from an actual pilot measurement. One finding worth recording: the
-demodulation rate has to be sized for the *modulated* signal, not for the multiplex inside it.
-Carson's rule makes a full-deviation stereo transmission 270 kHz wide, so decimating to 240 kHz
-clipped its outer sidebands, and the clipping imitated a stereo pilot well enough that a mono
-station was confidently reported as stereo. 480 kHz leaves about 60 dB of margin. Filter lengths
-are now derived from the transition width they have to achieve, after a 129-tap low-pass at
-15 kHz turned out to leave the 19 kHz pilot almost untouched. Remaining: libVLC playback and the
-`listen` command.
+**What Phase 3 delivered.** `openwave listen 98.0` tunes a station and plays it. Unlike the SDR
+drivers, this path is genuinely verified: libVLC runs on an ordinary machine, so CI installs it
+and the playback tests really start it, hand it a live stream and check that it decodes it.
+
+Four findings, all from measurement:
+
+- The demodulation rate has to be sized for the *modulated* signal, not the multiplex inside
+  it. Carson's rule makes a full-deviation stereo transmission 270 kHz wide, so decimating to
+  240 kHz clipped its outer sidebands, and the clipping imitated a stereo pilot well enough
+  that a mono station was reported as stereo. 480 kHz leaves about 60 dB of margin.
+- Filter lengths are derived from the transition width they have to achieve. A 129-tap
+  low-pass at 15 kHz left the 19 kHz pilot almost untouched, so the "mono" output still
+  carried it; designed properly it is rejected by over 100 dB.
+- Blocks are demodulated with an overlap, and the amount of output to discard is measured
+  rather than computed from a ratio. Without the overlap there is an audible tick nine times a
+  second; with a ratio-derived discard count there is a repeated sample at every join.
+- The output level comes from the deviation, not from each block's loudest sample, or the
+  volume breathes in time with the blocks.
+
+And one real bug: a read callback that waits indefinitely deadlocks `stop()`, because libVLC's
+thread is inside the callback while `stop()` waits for that thread. It now gives up after a
+timeout.
 
 ## Phase 4 — v0.3 · RDS decoding
 

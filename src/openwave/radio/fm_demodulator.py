@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from fractions import Fraction
+from typing import Literal
 
 import numpy as np
 import numpy.typing as npt
@@ -32,6 +33,7 @@ from scipy import signal as scipy_signal
 from openwave.radio.constants import (
     FM_AUDIO_BANDWIDTH_HZ,
     FM_DEEMPHASIS_TAU_S,
+    FM_MAX_DEVIATION_HZ,
     FM_MPX_BANDWIDTH_HZ,
     STEREO_PILOT_HZ,
     STEREO_SUBCARRIER_HZ,
@@ -67,6 +69,9 @@ AudioSamples = npt.NDArray[np.float32]
 
 #: Real-valued baseband signal, such as the recovered multiplex.
 RealSignal = npt.NDArray[np.float64]
+
+#: How to set the output level. See :func:`_normalising_scale`.
+Normalisation = Literal["deviation", "peak"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,6 +323,8 @@ def demodulate(
     audio_rate_hz: float = AUDIO_SAMPLE_RATE_HZ,
     stereo_threshold_db: float = 10.0,
     deemphasis_tau_s: float = FM_DEEMPHASIS_TAU_S,
+    normalise: Normalisation = "deviation",
+    reference_deviation_hz: float = FM_MAX_DEVIATION_HZ,
 ) -> DemodulatedAudio:
     """Turn IQ samples into audio, deciding stereo or mono from the pilot.
 
@@ -330,6 +337,12 @@ def demodulate(
             difference channel is decoded. Decoding a difference channel that is not there adds
             noise to both outputs, so the threshold errs towards mono.
         deemphasis_tau_s: De-emphasis time constant. 50 µs in Europe, 75 µs in the Americas.
+        normalise: How to set the output level. ``"deviation"`` uses a fixed reference and so
+            gives the same level for every block, which is what continuous listening needs.
+            ``"peak"`` fills the available range using the loudest sample present, which only
+            makes sense for a single finite block.
+        reference_deviation_hz: Deviation treated as full scale when ``normalise`` is
+            ``"deviation"``.
     """
     shifted = shift_to_baseband(samples, offset_hz=offset_hz, sample_rate_hz=sample_rate_hz)
     baseband, mpx_rate_hz = decimate_to(shifted, sample_rate_hz=sample_rate_hz)
@@ -356,10 +369,15 @@ def demodulate(
     left_audio, actual_rate = _resample_to(left, from_rate_hz=mpx_rate_hz, to_rate_hz=audio_rate_hz)
     right_audio, _ = _resample_to(right, from_rate_hz=mpx_rate_hz, to_rate_hz=audio_rate_hz)
 
-    scale = _normalising_scale(left_audio, right_audio)
+    scale = _normalising_scale(
+        left_audio,
+        right_audio,
+        normalise=normalise,
+        reference_deviation_hz=reference_deviation_hz,
+    )
     return DemodulatedAudio(
-        left=(left_audio * scale).astype(np.float32),
-        right=(right_audio * scale).astype(np.float32),
+        left=np.clip(left_audio * scale, -1.0, 1.0).astype(np.float32),
+        right=np.clip(right_audio * scale, -1.0, 1.0).astype(np.float32),
         sample_rate_hz=actual_rate,
         is_stereo=stereo,
         pilot_level_db=pilot_db,
@@ -466,13 +484,29 @@ def _resample_to(
     return resampled, from_rate_hz * up / down
 
 
-def _normalising_scale(left: RealSignal, right: RealSignal) -> float:
-    """A factor that brings the loudest sample to just under full scale.
+def _normalising_scale(
+    left: RealSignal,
+    right: RealSignal,
+    *,
+    normalise: Normalisation,
+    reference_deviation_hz: float,
+) -> float:
+    """A factor bringing demodulated audio into the range playback expects.
 
-    FM audio comes out of the demodulator in hertz of deviation, which is a number in the tens
-    of thousands. Playback wants values between -1 and 1, and the deviation a station actually
-    uses is not known in advance, so the level is set from what arrived.
+    The demodulator produces hertz of deviation, a number in the tens of thousands. Playback
+    wants values between -1 and 1.
+
+    ``"deviation"`` divides by a fixed reference, so the same loudness always comes out at the
+    same level. ``"peak"`` scales by the loudest sample in what it was given, which fills the
+    range better but makes the gain depend on the block -- and for continuous listening, where
+    audio arrives in blocks of a tenth of a second, that is audible as the volume breathing in
+    time with the blocks. Hence the fixed reference by default, and peak only for one-shot use.
     """
+    if normalise == "deviation":
+        if reference_deviation_hz <= 0:
+            raise ValueError(f"reference deviation must be positive, got {reference_deviation_hz}")
+        return 1.0 / reference_deviation_hz
+
     peak = max(float(np.max(np.abs(left))), float(np.max(np.abs(right))), 0.0)
     if peak == 0.0:
         return 1.0

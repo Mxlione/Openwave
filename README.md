@@ -65,7 +65,7 @@ OpenWave is in early development. Nothing is released yet.
 | Hardware abstraction layer (`sdr/`) | 🟢 in place |
 | Simulated devices (synthetic IQ, MPEG-TS replay) | 🟢 in place |
 | FM band scan (v0.1) | 🟢 in place |
-| FM demodulation and playback (v0.2) | 🟡 demodulation done, playback to come |
+| FM demodulation and playback (v0.2) | 🟢 in place |
 | RDS decoding (v0.3) | 🔴 not started |
 | DVB-T scan (v0.4) | 🔴 not started |
 | HTTP API (v0.5) | 🔴 not started |
@@ -206,7 +206,7 @@ OpenWave/
 
 - **Receivers**: RTL-SDR, DVB-T tuners, other SDRs through SoapySDR
 - **Signal processing**: NumPy / SciPy — FM demodulation, RDS decoding, spectrum analysis
-- **Media**: FFmpeg, libVLC
+- **Media**: libVLC through `python-vlc`, pulling a live stream through media callbacks
 - **API**: FastAPI, local service exposing scan results and streams
 - **Interface**: Angular
 

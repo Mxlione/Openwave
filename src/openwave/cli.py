@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import time
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
@@ -16,8 +18,11 @@ from openwave.core.frequency_manager import BandPlan
 from openwave.core.scanner import ScanSettings
 from openwave.core.signal_detector import DEFAULT_DETECTION_THRESHOLD_DB
 from openwave.core.units import format_frequency
-from openwave.radio.band import FM_BAND_PLANS
+from openwave.media.libvlc import LibVlcPlayer, PlaybackUnavailableError
+from openwave.media.wav import WAV_HEADER_SIZE, WavFormat, wav_header
+from openwave.radio.band import FM_BAND_PLAN, FM_BAND_PLANS
 from openwave.radio.demo import demo_receiver
+from openwave.radio.listener import FmListener, ListenSettings
 from openwave.radio.station import Station
 from openwave.radio.station_detector import FmScanResult, scan_fm
 from openwave.sdr import DeviceError, list_devices, open_device
@@ -324,6 +329,122 @@ def _scan_as_json(result: FmScanResult, plan: BandPlan) -> str:
 def scan_tv(device: DeviceOption = "mock") -> None:
     """Scan the DVB-T multiplexes and list the channels found."""
     raise typer.Exit(_not_implemented("DVB-T scanning", "v0.4", task=42))
+
+
+@app.command()
+def listen(
+    frequency: Annotated[
+        float,
+        typer.Argument(
+            help="Frequency to listen to, in MHz. For example 98.0, or 98000000 in hertz."
+        ),
+    ],
+    device: DeviceOption = "mock",
+    demo: Annotated[
+        bool,
+        typer.Option("--demo", help="Listen to an invented band instead of a receiver."),
+    ] = False,
+    seconds: Annotated[
+        float | None,
+        typer.Option("--seconds", "-s", help="Stop after this long. Default: until interrupted."),
+    ] = None,
+    record: Annotated[
+        Path | None,
+        typer.Option(
+            "--record",
+            "-o",
+            help="Write the audio to a WAV file instead of playing it. Needs --seconds.",
+        ),
+    ] = None,
+) -> None:
+    """Tune one FM station and play it through libVLC.
+
+    Press Ctrl-C to stop. With --demo, listens to an invented band, which is a way to hear that
+    the demodulator works without owning a receiver.
+    """
+    freq_hz = frequency * 1e6 if frequency < 1e6 else frequency
+    if not FM_BAND_PLAN.contains(freq_hz) and not record:
+        console.print(
+            f"[yellow]{format_frequency(freq_hz)} is outside the FM broadcast band[/yellow] "
+            f"({format_frequency(FM_BAND_PLAN.start_hz)} to "
+            f"{format_frequency(FM_BAND_PLAN.end_hz)}). Carrying on anyway."
+        )
+    if record is not None and seconds is None:
+        errors.print("[red]--record needs --seconds:[/red] a file has to end somewhere.")
+        raise typer.Exit(2)
+
+    try:
+        receiver = demo_receiver() if demo else open_device(device)
+        with receiver:
+            listener = FmListener(receiver, freq_hz, settings=ListenSettings())
+            if record is not None:
+                _record(listener, record, seconds=seconds or 0.0)
+            else:
+                _play(listener, seconds=seconds)
+    except DeviceError as error:
+        errors.print(f"[red]{type(error).__name__}:[/red] {escape(str(error))}")
+        raise typer.Exit(1) from error
+    except PlaybackUnavailableError as error:
+        errors.print(f"[red]Cannot play audio:[/red] {escape(str(error))}")
+        errors.print("[dim]Use --record to write a WAV file instead.[/dim]")
+        raise typer.Exit(1) from error
+
+
+def _play(listener: FmListener, *, seconds: float | None) -> None:
+    """Play a station through libVLC until the time runs out or the user interrupts."""
+    console.print(f"Listening to [bold]{format_frequency(listener.freq_hz)}[/bold]")
+    with listener:
+        player = LibVlcPlayer(listener.stream, sample_rate_hz=listener.audio_rate_hz)
+        try:
+            player.play()
+            console.print("[dim]Press Ctrl-C to stop.[/dim]")
+            deadline = None if seconds is None else time.monotonic() + seconds
+            reported_stereo: bool | None = None
+            while listener.is_running and (deadline is None or time.monotonic() < deadline):
+                if listener.is_stereo != reported_stereo:
+                    reported_stereo = listener.is_stereo
+                    if reported_stereo is not None:
+                        console.print(f"  {'stereo' if reported_stereo else 'mono'}")
+                time.sleep(0.2)
+        except KeyboardInterrupt:
+            console.print("\nStopped.")
+        finally:
+            player.stop()
+
+    if listener.error is not None:
+        errors.print(f"[red]Reception stopped:[/red] {escape(str(listener.error))}")
+        raise typer.Exit(1)
+
+
+def _record(listener: FmListener, path: Path, *, seconds: float) -> None:
+    """Write a station's audio to a WAV file, for a machine with no audio output."""
+    console.print(
+        f"Recording [bold]{format_frequency(listener.freq_hz)}[/bold] for {seconds:g} s to {path}"
+    )
+    collected = bytearray()
+    wanted = int(seconds * listener.audio_rate_hz) * 4  # 2 channels, 2 bytes each
+    with listener:
+        try:
+            while len(collected) < wanted and listener.is_running:
+                chunk = listener.stream.read(1 << 16, timeout_s=1.0)
+                if not chunk:
+                    break
+                collected.extend(chunk)
+        except KeyboardInterrupt:
+            console.print("\nStopped early.")
+
+    if listener.error is not None:
+        errors.print(f"[red]Reception stopped:[/red] {escape(str(listener.error))}")
+        raise typer.Exit(1)
+
+    audio = bytes(collected[:wanted]) if wanted else bytes(collected)
+    fmt = WavFormat(sample_rate_hz=listener.audio_rate_hz, channels=2)
+    path.write_bytes(wav_header(fmt, data_bytes=len(audio)) + audio)
+    duration = len(audio) / fmt.byte_rate
+    console.print(
+        f"Wrote {len(audio) + WAV_HEADER_SIZE} bytes, {duration:.2f} s of "
+        f"{'stereo' if listener.is_stereo else 'mono'} audio."
+    )
 
 
 def _not_implemented(what: str, milestone: str, task: int) -> int:

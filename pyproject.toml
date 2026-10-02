@@ -102,6 +102,7 @@ testpaths = ["tests", "src"]
 addopts = "-ra --strict-markers --doctest-modules"
 markers = [
     "hardware: requires a physical SDR or DVB-T receiver (skipped in CI)",
+    "media: requires libVLC and the python-vlc bindings",
     "slow: takes more than a few seconds",
 ]
 
