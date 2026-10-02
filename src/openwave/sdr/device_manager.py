@@ -25,6 +25,7 @@ from pathlib import Path
 from openwave.sdr.device import DeviceInfo, DvbDevice, SdrDevice
 from openwave.sdr.errors import DeviceNotFoundError
 from openwave.sdr.iq_file import IqFileSdrDevice, describe_capture
+from openwave.sdr.linux_dvb import SYS_DVBT, SYS_DVBT2, LinuxDvbDevice, list_dvb_adapters
 from openwave.sdr.mock import MockDvbDevice, MockSdrDevice
 from openwave.sdr.rtl_sdr import RtlSdrDevice, list_rtlsdr_devices
 
@@ -225,22 +226,47 @@ def describe_device(spec: str) -> str:
     return entry.description
 
 
+#: DVB tuner drivers, by name.
+DVB_DRIVERS: tuple[str, ...] = ("mockdvb", "linuxdvb", "linuxdvb2")
+
+
 def open_dvb_device(spec: str = "mockdvb") -> DvbDevice:
     """Open a demodulating DVB tuner.
 
-    Only the simulator exists so far. The Linux DVB backend arrives with the DVB-T scan in v0.4
-    (task 35 in TASKS.md), at which point this grows a registry like the one above.
+    ``mockdvb`` is the simulator. ``linuxdvb`` is a real tuner through the Linux DVB API, and
+    ``linuxdvb2`` is the same tuner asked for DVB-T2 rather than DVB-T -- which matters,
+    because most of Europe now broadcasts DVB-T2 and a DVB-T2 signal will not lock as DVB-T.
+    An adapter number may follow a colon, as in ``linuxdvb:1``.
 
     Raises:
-        DeviceNotFoundError: if no such tuner driver exists.
+        DeviceNotFoundError: if no such tuner driver exists, or the tuner is not there.
+        DeviceBusyError: if another program already holds it.
     """
     name, target = parse_spec(spec)
-    if name != "mockdvb":
-        raise DeviceNotFoundError(
-            f"no DVB tuner driver called {name!r}; only 'mockdvb' exists so far. "
-            "Real DVB-T support arrives in v0.4."
+    index = int(target) if target and target.isdigit() else 0
+
+    if name == "mockdvb":
+        return MockDvbDevice(index=index)
+    if name in ("linuxdvb", "linuxdvb2"):
+        return LinuxDvbDevice(
+            adapter=index,
+            delivery_system=SYS_DVBT2 if name == "linuxdvb2" else SYS_DVBT,
         )
-    return MockDvbDevice(index=int(target) if target else 0)
+    raise DeviceNotFoundError(
+        f"no DVB tuner driver called {name!r}; available drivers are {', '.join(DVB_DRIVERS)}"
+    )
+
+
+def list_dvb_devices(*, include_hardware: bool = True) -> list[DeviceInfo]:
+    """Every DVB tuner that can currently be opened.
+
+    The simulator is always listed. Real adapters are found by looking at ``/dev/dvb``, which
+    costs nothing and fails quietly when the directory is not there.
+    """
+    found = [MockDvbDevice().info]
+    if include_hardware:
+        found.extend(list_dvb_adapters())
+    return found
 
 
 def format_device_list(devices: Iterable[DeviceInfo]) -> str:
@@ -251,12 +277,14 @@ def format_device_list(devices: Iterable[DeviceInfo]) -> str:
 
 __all__ = [
     "DRIVERS",
+    "DVB_DRIVERS",
     "DriverEntry",
     "describe_device",
     "driver",
     "driver_names",
     "format_device_list",
     "list_devices",
+    "list_dvb_devices",
     "open_device",
     "open_dvb_device",
     "parse_spec",

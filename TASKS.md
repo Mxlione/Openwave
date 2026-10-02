@@ -141,14 +141,47 @@ never trimmed and appeared padded with the remains of the previous one.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 35 | ⬜ 📡 | Linux DVB backend | `/dev/dvb/*` frontend ioctls, or `dvbv5` bindings |
-| 36 | ⬜ | `dvb_scanner` | UHF plan 470–694 MHz, 8 MHz channels, tuning and lock detection |
-| 37 | ⬜ | `mux_parser` | TS demultiplexing, PID filtering, section reassembly |
-| 38 | ⬜ | PSI/SI tables | PAT, PMT, SDT, NIT parsing |
-| 39 | ⬜ | `service_parser` | Name, type (TV/radio), LCN, audio/video PIDs, scrambled flag |
-| 40 | ⬜ 🟢 | `Channel` model | `name`, `mux_freq_hz`, `service_id`, `type`, `lcn`, `scrambled` |
-| 41 | ⬜ | Tests | Expected service list from sample TS fixtures |
-| 42 | ⬜ 🟢 | CLI `openwave scan tv` | Rich table plus JSON export |
+| 35 | ✅ 📡 | Linux DVB backend | `/dev/dvb/*` frontend ioctls, or `dvbv5` bindings |
+| 36 | ✅ | `dvb_scanner` | UHF plan 470–694 MHz, 8 MHz channels, tuning and lock detection |
+| 37 | ✅ | `mux_parser` | TS demultiplexing, PID filtering, section reassembly |
+| 38 | ✅ | PSI/SI tables | PAT, PMT, SDT, NIT parsing |
+| 39 | ✅ | `service_parser` | Name, type (TV/radio), LCN, audio/video PIDs, scrambled flag |
+| 40 | ✅ | `Channel` model | `name`, `mux_freq_hz`, `service_id`, `type`, `lcn`, `scrambled` |
+| 41 | ✅ | Tests | Expected service list from sample TS fixtures |
+| 42 | ✅ | CLI `openwave scan tv` | Rich table plus JSON export |
+
+**What Phase 5 delivered.** `openwave scan tv --demo` tunes twenty-eight UHF channels, locks
+onto three multiplexes and lists nine services by the number a viewer would type — television
+and radio told apart, and the one scrambled service listed and marked rather than quietly
+dropped.
+
+As with RDS, the testable part came first: there was no transport stream to work with, so one
+had to be built. `tv/synthesis.py` writes real 188-byte packets with correct CRC-32s and
+repeating tables, from the standards rather than from the parser, which is what makes the round
+trip prove something.
+
+Points worth recording:
+
+- **Every length in a transport stream comes off the air.** An adaptation field can claim to run
+  past the end of its packet, a section pointer can point outside its payload, and a section can
+  claim to be longer than the standard permits. All three are bounded here, because believing
+  any of them lets a transmitter decide how much memory a receiver allocates or read past the
+  end of a buffer.
+- **The PMT PIDs are only discoverable from the PAT**, so the parser starts listening to PIDs it
+  did not know about a moment earlier. It also stops as soon as the tables are complete:
+  measured on the demonstration multiplex, eight packets out of forty-eight.
+- **A service in one table and not another is normal, not an error.** A multiplex gets
+  reconfigured while on the air, so a scan can easily catch an SDT from before a change and a
+  PAT from after it. The join is deliberately generous; dropping either side would make a
+  channel vanish for reasons a viewer cannot see.
+- **The frequency recorded is the tuner's, not the NIT's.** The NIT says where a transmitter
+  claims to be; the tuner knows where it actually heard it.
+- **MPEG's CRC-32 is not the familiar one.** Same polynomial, bits fed the other way, starting
+  from all ones, no final inversion. Using zlib's would reject every real transmission.
+
+The Linux DVB driver is the riskiest code in the project and the one part a test cannot really
+check: it lays out kernel structures byte by byte, and a field in the wrong place does not raise
+— it tunes to the wrong frequency. Its module docstring lists what to verify first.
 
 ## Phase 6 — v0.5 · Stable API
 

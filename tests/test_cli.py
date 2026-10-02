@@ -278,10 +278,80 @@ class TestListen:
         assert "no driver called" in " ".join(result.output.split())
 
 
-class TestNotYetImplemented:
-    def test_scanning_tv_says_which_version_brings_it(self) -> None:
-        result = runner.invoke(app, ["scan", "tv"])
-        assert result.exit_code == 1
+class TestScanTv:
+    def test_the_demonstration_multiplexes_produce_a_channel_list(self) -> None:
+        result = runner.invoke(app, ["scan", "tv", "--demo", "--lock-timeout", "0.1"])
+        assert result.exit_code == 0, result.output
         text = " ".join(result.output.split())
-        assert "v0.4" in text
-        assert "task 42" in text
+        assert "9 services in 3 multiplexes" in text
+        for name in ("OpenWave One", "OpenWave HD", "Local Radio"):
+            assert name in text
+
+    def test_television_and_radio_are_distinguished(self) -> None:
+        text = output("scan", "tv", "--demo", "--lock-timeout", "0.1")
+        assert "television" in text
+        assert "radio" in text
+
+    def test_a_scrambled_service_is_listed_and_marked(self) -> None:
+        # Listing it matters: a list that silently omits what cannot be watched leaves a viewer
+        # wondering where a channel went.
+        text = output("scan", "tv", "--demo", "--lock-timeout", "0.1")
+        assert "Premium Sport" in text
+        assert "scrambled" in text
+
+    def test_scrambled_services_can_be_left_out(self) -> None:
+        text = output("scan", "tv", "--demo", "--lock-timeout", "0.1", "--no-scrambled")
+        assert "Premium Sport" not in text
+
+    def test_json_output_is_machine_readable(self) -> None:
+        result = runner.invoke(app, ["scan", "tv", "--demo", "--lock-timeout", "0.1", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["band"] == "UHF"
+        assert payload["channels_tried"] == 28
+        assert len(payload["multiplexes"]) == 3
+        assert len(payload["channels"]) == 9
+        assert {"name", "service_id", "mux_freq_hz", "logical_channel"} <= set(
+            payload["channels"][0]
+        )
+
+    def test_the_multiplexes_are_reported_with_their_channel_numbers(self) -> None:
+        payload = json.loads(
+            runner.invoke(app, ["scan", "tv", "--demo", "--lock-timeout", "0.1", "--json"]).output
+        )
+        assert {mux["channel"] for mux in payload["multiplexes"]} == {24, 27, 31}
+
+    def test_an_empty_band_explains_what_to_try(self) -> None:
+        result = runner.invoke(app, ["scan", "tv", "--tuner", "mockdvb", "--lock-timeout", "0.05"])
+        assert result.exit_code == 0
+        text = " ".join(result.output.split())
+        assert "No services found" in text
+        assert "--demo" in text
+
+    def test_an_unknown_band_lists_the_valid_ones(self) -> None:
+        result = runner.invoke(app, ["scan", "tv", "--demo", "--band", "satellite"])
+        assert result.exit_code == 2
+        text = " ".join(result.output.split())
+        assert "Unknown band" in text
+        assert "vhf" in text
+
+    def test_the_vhf_plan_is_available(self) -> None:
+        payload = json.loads(
+            runner.invoke(
+                app,
+                ["scan", "tv", "--demo", "--band", "vhf", "--lock-timeout", "0.05", "--json"],
+            ).output
+        )
+        assert payload["band"] == "VHF band III"
+
+    def test_an_unknown_tuner_fails_cleanly(self) -> None:
+        result = runner.invoke(app, ["scan", "tv", "--tuner", "hauppauge"])
+        assert result.exit_code == 1
+        assert "no DVB tuner driver" in " ".join(result.output.split())
+
+    def test_a_real_tuner_with_no_hardware_fails_cleanly(self) -> None:
+        # Which is what somebody without a tuner sees, so it has to read as advice rather than
+        # as a crash.
+        result = runner.invoke(app, ["scan", "tv", "--tuner", "linuxdvb", "--lock-timeout", "0.05"])
+        assert result.exit_code == 1
+        assert "no DVB frontend" in " ".join(result.output.split())

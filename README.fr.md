@@ -67,7 +67,7 @@ OpenWave est en développement initial. Rien n'est encore publié.
 | Scan de la bande FM (v0.1) | 🟢 en place |
 | Démodulation FM et écoute (v0.2) | 🟢 en place |
 | Décodage RDS (v0.3) | 🟢 en place |
-| Scan DVB-T (v0.4) | 🔴 à faire |
+| Scan DVB-T (v0.4) | 🟢 en place |
 | API HTTP (v0.5) | 🔴 à faire |
 | Interface Angular (v0.6) | 🔴 à faire |
 | Spectre temps réel (v0.7) | 🔴 à faire |
@@ -161,10 +161,14 @@ OpenWave/
 │   │   └── rds/           # RDS : blocs, groupes, encodeur, décodeur
 │   │
 │   ├── tv/                # Télévision numérique
+│   │   ├── band.py        # Plans de canaux UHF et VHF
 │   │   ├── dvb_scanner.py
 │   │   ├── mux_parser.py
-│   │   ├── channel_detector.py
-│   │   └── service_parser.py
+│   │   ├── psi.py         # Sections PSI, leur CRC et leur réassemblage
+│   │   ├── service_parser.py
+│   │   ├── synthesis.py   # Multiplex synthétiques, pour tester sans tuner
+│   │   ├── tables.py      # PAT, PMT, SDT, NIT
+│   │   └── ts.py          # Le paquet de transport de 188 octets
 │   │
 │   ├── sdr/               # Accès aux récepteurs
 │   │   ├── device.py      # Interfaces SdrDevice / DvbDevice

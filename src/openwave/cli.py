@@ -26,7 +26,15 @@ from openwave.radio.listener import FmListener, ListenSettings
 from openwave.radio.station import Station
 from openwave.radio.station_detector import FmScanResult, IdentifySettings, scan_fm
 from openwave.sdr import DeviceError, list_devices, open_device
-from openwave.sdr.device_manager import describe_device, driver_names
+from openwave.sdr.device_manager import describe_device, driver_names, open_dvb_device
+from openwave.tv.band import TELEVISION_PLANS, TelevisionChannelPlan
+from openwave.tv.demo import demo_tuner
+from openwave.tv.dvb_scanner import (
+    DEFAULT_LOCK_TIMEOUT_S,
+    DvbScanResult,
+    DvbScanSettings,
+    scan_dvb,
+)
 
 app = typer.Typer(
     name="openwave",
@@ -356,9 +364,189 @@ def _scan_as_json(result: FmScanResult, plan: BandPlan) -> str:
 
 
 @scan_app.command("tv")
-def scan_tv(device: DeviceOption = "mock") -> None:
-    """Scan the DVB-T multiplexes and list the channels found."""
-    raise typer.Exit(_not_implemented("DVB-T scanning", "v0.4", task=42))
+def scan_tv_command(
+    tuner: Annotated[
+        str,
+        typer.Option(
+            "--tuner",
+            "-u",
+            help="DVB tuner to use: 'mockdvb' for the simulator, 'linuxdvb' for real hardware.",
+        ),
+    ] = "mockdvb",
+    band: Annotated[
+        str,
+        typer.Option("--band", "-b", help=f"Channel plan: {', '.join(TELEVISION_PLANS)}."),
+    ] = "uhf",
+    demo: Annotated[
+        bool,
+        typer.Option(
+            "--demo",
+            help=(
+                "Scan invented multiplexes, to see what a television scan looks like without "
+                "a tuner. Overrides --tuner."
+            ),
+        ),
+    ] = False,
+    lock_timeout: Annotated[
+        float,
+        typer.Option(
+            "--lock-timeout",
+            help=(
+                "Seconds to give the demodulator to lock onto each channel. Most channels are "
+                "empty, so this is what a scan mostly spends its time on."
+            ),
+        ),
+    ] = DEFAULT_LOCK_TIMEOUT_S,
+    scrambled: Annotated[
+        bool,
+        typer.Option(
+            "--scrambled/--no-scrambled",
+            help="List services that are encrypted and so cannot be watched.",
+        ),
+    ] = True,
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Print the result as JSON instead of a table.")
+    ] = False,
+) -> None:
+    """Scan the DVB-T channels and list the services found.
+
+    Tunes each channel of the plan in turn, waits for the demodulator to lock, and reads the
+    multiplex's own tables to find out what it carries and what each service is called.
+
+    With no tuner attached, --demo scans invented multiplexes so the output can be seen.
+    """
+    plan = _television_plan(band)
+    settings = DvbScanSettings(lock_timeout_s=lock_timeout, include_scrambled=scrambled)
+
+    try:
+        with demo_tuner() if demo else open_dvb_device(tuner) as receiver:
+            if not as_json:
+                label = "invented multiplexes" if demo else escape(receiver.info.label)
+                console.print(f"Scanning {plan} with [bold]{label}[/bold]")
+            result = _run_tv_scan(receiver, plan, settings, quiet=as_json)
+    except DeviceError as error:
+        errors.print(f"[red]{type(error).__name__}:[/red] {escape(str(error))}")
+        raise typer.Exit(1) from error
+
+    if as_json:
+        console.print_json(_tv_scan_as_json(result))
+        return
+    _print_channels(result)
+
+
+def _television_plan(name: str) -> TelevisionChannelPlan:
+    """Look up a channel plan by name, or exit with the list of valid names."""
+    plan = TELEVISION_PLANS.get(name.lower())
+    if plan is None:
+        errors.print(
+            f"[red]Unknown band {name!r}.[/red] Available bands: {', '.join(TELEVISION_PLANS)}."
+        )
+        raise typer.Exit(2)
+    return plan
+
+
+def _run_tv_scan(
+    receiver: Any, plan: TelevisionChannelPlan, settings: DvbScanSettings, *, quiet: bool
+) -> DvbScanResult:
+    """Run a television scan, with a progress bar unless the output is machine-readable."""
+    if quiet:
+        return scan_dvb(receiver, plan, settings=settings)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Tuning channels", total=plan.channel_count)
+
+        def on_channel(index: int, total: int, freq_hz: float) -> None:
+            channel = plan.channel_of(freq_hz)
+            where = f"channel {channel}" if channel is not None else format_frequency(freq_hz)
+            progress.update(task, completed=index, total=total, description=f"Tuning {where}")
+
+        return scan_dvb(receiver, plan, settings=settings, progress=on_channel)
+
+
+def _print_channels(result: DvbScanResult) -> None:
+    """Render a television scan result as a table."""
+    if not result.channels:
+        console.print(
+            "[yellow]No services found.[/yellow] With the plain simulator this is expected: "
+            "it carries nothing unless told to, so try [bold]--demo[/bold]. Against real "
+            "hardware, check the aerial and that the band is the right one for your country."
+        )
+        return
+
+    numbered = any(channel.logical_channel is not None for channel in result.channels)
+
+    table = Table(header_style="bold", title_justify="left")
+    if numbered:
+        table.add_column("No.", justify="right", style="cyan", no_wrap=True)
+    table.add_column("Service")
+    table.add_column("Kind")
+    table.add_column("Multiplex", justify="right", style="dim")
+    table.add_column("Provider", style="dim")
+
+    for channel in result.channels:
+        row: list[str] = []
+        if numbered:
+            row.append(str(channel.logical_channel) if channel.logical_channel is not None else "-")
+        name = channel.name
+        if channel.scrambled:
+            name += " [dim](scrambled)[/dim]"
+        row.extend(
+            [
+                name,
+                channel.kind.value,
+                f"{channel.mux_freq_hz / 1e6:.0f} MHz",
+                channel.provider or "",
+            ]
+        )
+        table.add_row(*row)
+
+    console.print(table)
+    console.print(f"[dim]{result}[/dim]")
+
+    if result.incomplete:
+        console.print(
+            f"[yellow]{len(result.incomplete)} multiplex(es) locked but could not be "
+            "read.[/yellow] The signal is there and its tables are not, which usually means "
+            "marginal reception: try a better aerial or a longer --lock-timeout."
+        )
+    if not numbered:
+        console.print(
+            "[dim]No channel numbers: these multiplexes do not publish them. The descriptor "
+            "that carries them is a private extension, not part of the standard.[/dim]"
+        )
+
+
+def _tv_scan_as_json(result: DvbScanResult) -> str:
+    """Serialise a television scan for scripts and for the API to reuse later."""
+    payload = {
+        "band": result.plan.name,
+        "channels_tried": result.channels_tried,
+        "duration_s": round(result.duration_s, 3),
+        "multiplexes": [
+            {
+                "freq_hz": mux.freq_hz,
+                "channel": mux.channel_number,
+                "bandwidth_hz": mux.bandwidth_hz,
+                "transport_stream_id": mux.tables.pat.transport_stream_id
+                if mux.tables.pat
+                else None,
+                "network_name": mux.network_name or None,
+                "snr_db": mux.quality.snr_db,
+                "services": len(mux.channels),
+            }
+            for mux in result.muxes
+        ],
+        "incomplete": [mux.freq_hz for mux in result.incomplete],
+        "channels": [channel.model_dump() for channel in result.channels],
+    }
+    return json.dumps(payload, indent=2)
 
 
 @app.command()
@@ -475,14 +663,6 @@ def _record(listener: FmListener, path: Path, *, seconds: float) -> None:
         f"Wrote {len(audio) + WAV_HEADER_SIZE} bytes, {duration:.2f} s of "
         f"{'stereo' if listener.is_stereo else 'mono'} audio."
     )
-
-
-def _not_implemented(what: str, milestone: str, task: int) -> int:
-    """Report an unimplemented command, pointing at the task that will deliver it."""
-    errors.print(f"[yellow]{what} is not implemented yet.[/yellow]")
-    errors.print(f"It lands in [bold]{milestone}[/bold] — task {task} in TASKS.md.")
-    errors.print("Contributions welcome: https://github.com/Mxlione/Openwave")
-    return 1
 
 
 if __name__ == "__main__":

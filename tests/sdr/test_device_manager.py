@@ -6,7 +6,6 @@ and every malformed form has to produce a message that says what to write instea
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import numpy as np
@@ -167,9 +166,23 @@ class TestOpenDvbDevice:
     def test_it_can_be_opened_by_index(self) -> None:
         assert open_dvb_device("mockdvb:2").info.index == 2
 
-    def test_a_real_tuner_says_when_it_will_arrive(self) -> None:
-        with pytest.raises(DeviceNotFoundError, match=re.escape("v0.4")):
-            open_dvb_device("linuxdvb")
+    def test_a_real_tuner_is_built_without_being_opened(self) -> None:
+        # Construction must not touch hardware: the caller decides when to claim it.
+        from openwave.sdr.linux_dvb import LinuxDvbDevice
+
+        device = open_dvb_device("linuxdvb:1")
+        assert isinstance(device, LinuxDvbDevice)
+        assert not device.is_open
+
+    def test_the_dvb_t2_variant_asks_for_dvb_t2(self) -> None:
+        # It matters: most of Europe now broadcasts DVB-T2, and a DVB-T2 signal will not lock
+        # as DVB-T, so a scan that finds nothing may just be set to the wrong one.
+        assert "DVB-T2" in open_dvb_device("linuxdvb2").info.label
+        assert "DVB-T," in open_dvb_device("linuxdvb").info.label
+
+    def test_an_unknown_tuner_driver_lists_the_known_ones(self) -> None:
+        with pytest.raises(DeviceNotFoundError, match="available drivers are"):
+            open_dvb_device("hauppauge")
 
 
 class TestFormatDeviceList:
