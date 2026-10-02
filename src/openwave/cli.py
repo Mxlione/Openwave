@@ -2,15 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+import json
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
 from rich.markup import escape
+from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
 from rich.table import Table
 
 from openwave import __version__
+from openwave.core.frequency_manager import BandPlan
+from openwave.core.scanner import ScanSettings
+from openwave.core.signal_detector import DEFAULT_DETECTION_THRESHOLD_DB
 from openwave.core.units import format_frequency
+from openwave.radio.band import FM_BAND_PLANS
+from openwave.radio.demo import demo_receiver
+from openwave.radio.station import Station
+from openwave.radio.station_detector import FmScanResult, scan_fm
 from openwave.sdr import DeviceError, list_devices, open_device
 from openwave.sdr.device_manager import describe_device, driver_names
 
@@ -129,9 +138,186 @@ def probe(device: DeviceOption = "mock") -> None:
 
 
 @scan_app.command("fm")
-def scan_fm(device: DeviceOption = "mock") -> None:
-    """Scan the FM broadcast band (87.5-108 MHz) and list the stations found."""
-    raise typer.Exit(_not_implemented("FM band scanning", "v0.1", task=22))
+def scan_fm_command(
+    device: DeviceOption = "mock",
+    band: Annotated[
+        str,
+        typer.Option("--band", "-b", help=f"Band plan: {', '.join(FM_BAND_PLANS)}."),
+    ] = "fm",
+    threshold_db: Annotated[
+        float,
+        typer.Option(
+            "--threshold",
+            "-t",
+            help="Signal-to-noise ratio in dB for a channel to count as occupied.",
+        ),
+    ] = DEFAULT_DETECTION_THRESHOLD_DB,
+    sample_rate: Annotated[
+        float | None,
+        typer.Option("--sample-rate", "-r", help="Sample rate in Hz. Default: the fastest usable."),
+    ] = None,
+    stereo: Annotated[
+        bool,
+        typer.Option(
+            "--stereo/--no-stereo",
+            help="Demodulate each station to decide stereo. Skipping it is quicker.",
+        ),
+    ] = True,
+    demo: Annotated[
+        bool,
+        typer.Option(
+            "--demo",
+            help=(
+                "Scan an invented band carrying eight stations, to see what a scan looks like "
+                "without a receiver. Overrides --device."
+            ),
+        ),
+    ] = False,
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Print the result as JSON instead of a table.")
+    ] = False,
+) -> None:
+    """Scan the FM broadcast band and list the stations found.
+
+    Measures the power in every channel on the grid, then returns to each occupied one and
+    demodulates it to decide whether it is stereo.
+
+    With no receiver attached, --demo scans an invented band so the output can be seen.
+    """
+    plan = _band_plan(band)
+    settings = ScanSettings(sample_rate_hz=sample_rate, threshold_db=threshold_db)
+
+    try:
+        with demo_receiver() if demo else open_device(device) as receiver:
+            if not as_json:
+                label = "an invented band" if demo else escape(receiver.info.label)
+                console.print(f"Scanning {plan} with [bold]{label}[/bold]")
+            result = _run_scan(receiver, plan, settings, stereo=stereo, quiet=as_json)
+    except DeviceError as error:
+        errors.print(f"[red]{type(error).__name__}:[/red] {escape(str(error))}")
+        raise typer.Exit(1) from error
+
+    if as_json:
+        console.print_json(_scan_as_json(result, plan))
+        return
+    _print_stations(result)
+
+
+def _band_plan(name: str) -> BandPlan:
+    """Look up a band plan by name, or exit with the list of valid names."""
+    plan = FM_BAND_PLANS.get(name.lower())
+    if plan is None:
+        errors.print(
+            f"[red]Unknown band {name!r}.[/red] Available bands: {', '.join(FM_BAND_PLANS)}."
+        )
+        raise typer.Exit(2)
+    return plan
+
+
+def _run_scan(
+    receiver: Any, plan: BandPlan, settings: ScanSettings, *, stereo: bool, quiet: bool
+) -> FmScanResult:
+    """Run a scan, with a progress bar unless output is meant to be machine-readable."""
+    if quiet:
+        return scan_fm(receiver, plan=plan, scan_settings=settings, identify=stereo)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        TaskProgressColumn(),
+        console=console,
+        transient=True,
+    ) as progress:
+        sweep = progress.add_task("Sweeping the band", total=None)
+        identify = progress.add_task("Checking stereo", total=None, visible=False)
+
+        def on_sweep(index: int, total: int, segment: object) -> None:
+            progress.update(sweep, completed=index, total=total)
+
+        def on_identify(index: int, total: int, freq_hz: float) -> None:
+            progress.update(
+                identify,
+                completed=index,
+                total=total,
+                visible=True,
+                description=f"Checking stereo at {format_frequency(freq_hz)}",
+            )
+
+        return scan_fm(
+            receiver,
+            plan=plan,
+            scan_settings=settings,
+            identify=stereo,
+            sweep_progress=on_sweep,
+            identify_progress=on_identify,
+        )
+
+
+def _print_stations(result: FmScanResult) -> None:
+    """Render a scan result as a table."""
+    if not result.stations:
+        console.print(
+            "[yellow]No stations found.[/yellow] With the plain simulator this is expected: it "
+            "carries nothing unless told to, so try [bold]--demo[/bold] to see what a scan "
+            "looks like. Against real hardware, check the antenna, lower [bold]--threshold[/bold] "
+            "and raise the gain."
+        )
+        return
+
+    # The name column only appears once there is something to put in it. RDS decoding lands in
+    # v0.3, so until then an always-empty column reads as a bug rather than as a future feature.
+    named = any(station.name for station in result.stations)
+
+    table = Table(header_style="bold", title_justify="left")
+    table.add_column("Frequency", justify="right", style="cyan", no_wrap=True)
+    table.add_column("SNR", justify="right")
+    table.add_column("Power", justify="right", style="dim")
+    table.add_column("Mode")
+    if named:
+        table.add_column("Name")
+
+    for station in result.stations:
+        row = [
+            f"{station.freq_mhz:.1f} MHz",
+            f"{station.snr_db:.1f} dB",
+            f"{station.power_dbfs:.1f} dBFS",
+            _mode_of(station),
+        ]
+        if named:
+            row.append(station.name or "")
+        table.add_row(*row)
+    console.print(table)
+    console.print(f"[dim]{result}[/dim]")
+    if not named:
+        console.print("[dim]Station names arrive with RDS decoding in v0.3.[/dim]")
+    if not result.scan.is_complete:
+        console.print(
+            f"[yellow]Only {result.scan.coverage:.0%} of the band was reachable[/yellow] "
+            f"({len(result.scan.skipped_segments)} tuning positions skipped). This is normal "
+            "when replaying a capture, which holds one window of spectrum."
+        )
+
+
+def _mode_of(station: Station) -> str:
+    """How to show a station's stereo status, including when it was not checked."""
+    if station.stereo is None:
+        return "[dim]unchecked[/dim]"
+    return "stereo" if station.stereo else "mono"
+
+
+def _scan_as_json(result: FmScanResult, plan: BandPlan) -> str:
+    """Serialise a scan result for scripts and for the API to reuse later."""
+    payload = {
+        "band": plan.name,
+        "sample_rate_hz": result.scan.sample_rate_hz,
+        "duration_s": round(result.scan.duration_s, 3),
+        "channels_measured": result.scan.channels_measured,
+        "coverage": round(result.scan.coverage, 4),
+        "complete": result.scan.is_complete,
+        "stations": [station.model_dump() for station in result.stations],
+    }
+    return json.dumps(payload, indent=2)
 
 
 @scan_app.command("tv")

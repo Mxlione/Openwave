@@ -64,8 +64,8 @@ OpenWave est en développement initial. Rien n'est encore publié.
 | Dépôt, CI, guide de contribution | 🟢 en place |
 | Couche d'abstraction matérielle (`sdr/`) | 🟢 en place |
 | Récepteurs simulés (IQ synthétiques, rejeu MPEG-TS) | 🟢 en place |
-| Scan de la bande FM (v0.1) | 🟡 en cours |
-| Démodulation FM et écoute (v0.2) | 🔴 à faire |
+| Scan de la bande FM (v0.1) | 🟢 en place |
+| Démodulation FM et écoute (v0.2) | 🟡 démodulation faite, écoute à venir |
 | Décodage RDS (v0.3) | 🔴 à faire |
 | Scan DVB-T (v0.4) | 🔴 à faire |
 | API HTTP (v0.5) | 🔴 à faire |

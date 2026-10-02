@@ -8,6 +8,7 @@ no message.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -92,15 +93,81 @@ class TestProbe:
         assert "the receiver works" in " ".join(result.output.split())
 
 
-class TestNotYetImplemented:
-    def test_scanning_fm_says_which_version_brings_it(self) -> None:
-        result = runner.invoke(app, ["scan", "fm"])
-        assert result.exit_code == 1
+class TestScanFm:
+    def test_the_demonstration_band_produces_a_station_list(self) -> None:
+        # The first thing somebody runs after cloning the repository, on a machine with no
+        # receiver attached. It has to show something.
+        result = runner.invoke(app, ["scan", "fm", "--demo"])
+        assert result.exit_code == 0
         text = " ".join(result.output.split())
-        assert "not implemented yet" in text
-        assert "v0.1" in text
-        assert "task 22" in text
+        assert "8 stations" in text
+        for frequency in ("88.1 MHz", "98.0 MHz", "107.9 MHz"):
+            assert frequency in text
 
+    def test_it_reports_which_stations_are_stereo(self) -> None:
+        text = output("scan", "fm", "--demo")
+        assert "stereo" in text
+        assert "mono" in text
+
+    def test_skipping_the_stereo_check_says_so_rather_than_guessing(self) -> None:
+        text = output("scan", "fm", "--demo", "--no-stereo")
+        assert "unchecked" in text
+        assert "mono" not in text
+
+    def test_an_empty_band_explains_what_to_try(self) -> None:
+        # The plain simulator carries nothing, so this is what a first run without --demo
+        # looks like. It must not read as a failure.
+        result = runner.invoke(app, ["scan", "fm", "--device", "mock"])
+        assert result.exit_code == 0
+        text = " ".join(result.output.split())
+        assert "No stations found" in text
+        assert "--demo" in text
+
+    def test_json_output_is_machine_readable(self) -> None:
+        result = runner.invoke(app, ["scan", "fm", "--demo", "--json"])
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["band"] == "FM broadcast"
+        assert payload["complete"] is True
+        assert payload["channels_measured"] == 206
+        assert len(payload["stations"]) == 8
+        assert {"freq_hz", "snr_db", "stereo"} <= set(payload["stations"][0])
+
+    def test_a_higher_threshold_finds_fewer_stations(self) -> None:
+        lenient = json.loads(
+            runner.invoke(app, ["scan", "fm", "--demo", "--json", "-t", "10"]).output
+        )
+        strict = json.loads(
+            runner.invoke(app, ["scan", "fm", "--demo", "--json", "-t", "45"]).output
+        )
+        assert len(strict["stations"]) < len(lenient["stations"])
+
+    def test_an_unknown_band_lists_the_valid_ones(self) -> None:
+        result = runner.invoke(app, ["scan", "fm", "--demo", "--band", "shortwave"])
+        assert result.exit_code == 2
+        text = " ".join(result.output.split())
+        assert "Unknown band" in text
+        assert "fm-japan" in text
+
+    def test_the_japanese_band_plan_is_available(self) -> None:
+        payload = json.loads(
+            runner.invoke(app, ["scan", "fm", "--demo", "--json", "--band", "fm-japan"]).output
+        )
+        assert payload["band"] == "FM broadcast (Japan)"
+
+    def test_names_are_promised_for_the_version_that_brings_rds(self) -> None:
+        # The name column is left out until there is something to put in it, so an
+        # always-empty column does not read as a bug.
+        text = output("scan", "fm", "--demo")
+        assert "RDS decoding in v0.3" in text
+
+    def test_a_receiver_that_cannot_reach_the_band_fails_cleanly(self) -> None:
+        result = runner.invoke(app, ["scan", "fm", "--device", "hackrf"])
+        assert result.exit_code == 1
+        assert "no driver called" in " ".join(result.output.split())
+
+
+class TestNotYetImplemented:
     def test_scanning_tv_says_which_version_brings_it(self) -> None:
         result = runner.invoke(app, ["scan", "tv"])
         assert result.exit_code == 1

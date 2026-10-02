@@ -50,24 +50,44 @@ A driver registry behind one `open_device("rtlsdr:1")` call. And `openwave devic
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 16 | ⬜ | `signal_detector` | Welch PSD, noise-floor estimation, **channel power** integration over the channel bandwidth. Not peak picking: wideband FM suppresses its own carrier, so peaks land on the deviation edges ([why](docs/architecture.md)) |
-| 17 | ⬜ 🟢 | `frequency_manager` | FM plan 87.5–108 MHz, 100 kHz raster, segmentation by device bandwidth |
-| 18 | ⬜ | `scanner` | Sweep orchestration, local-maximum selection across adjacent channels, edge-duplicate merging |
-| 19 | ⬜ 🟢 | `Station` model | `freq_hz`, `power_dbm`, `snr_db`, `bandwidth_hz`, `stereo`, `name` |
-| 20 | ⬜ | Stereo detection | Via the 19 kHz pilot tone |
-| 21 | ⬜ | Tests | Station injected at 98.0 MHz detected within ±50 kHz, with and without noise |
-| 22 | ⬜ 🟢 | CLI `openwave scan fm` | Rich table in the terminal, plus JSON export |
+| 16 | ✅ | `signal_detector` | Welch PSD, noise-floor estimation, **channel power** integration over the channel bandwidth. Not peak picking: wideband FM suppresses its own carrier, so peaks land on the deviation edges ([why](docs/architecture.md)) |
+| 17 | ✅ | `frequency_manager` | FM plan 87.5–108 MHz, 100 kHz raster, segmentation by device bandwidth |
+| 18 | ✅ | `scanner` | Sweep orchestration, strongest-first suppression of a station's spill into neighbouring channels, settling samples discarded after each retune |
+| 19 | ✅ | `Station` model | `freq_hz`, `power_dbfs`, `snr_db`, `bandwidth_hz`, `stereo`, `name`. Levels are in dBFS, not dBm: a consumer SDR has no calibrated power reference, so an absolute figure would be invented precision |
+| 20 | ✅ | Stereo detection | Via the 19 kHz pilot, measured against the multiplex either side of it |
+| 21 | ✅ | Tests | Known stations injected and recovered exactly, with and without noise, including a weak station beside a strong one |
+| 22 | ✅ | CLI `openwave scan fm` | Rich table in the terminal, plus JSON export |
+
+**What Phase 2 delivered.** A sweep of the FM band that finds every station and invents none.
+Two findings came out of measuring against the simulator rather than reasoning about it. Peak
+picking does not work on wideband FM, which suppresses its own carrier and puts its peaks on the
+deviation edges — channel power integration does, and the band plan assigns every channel to
+exactly one window wide enough to measure it. And suppressing a channel because a stronger one
+sits nearby is wrong when that neighbour is itself about to be discarded as spill: it lost a real
+station at 98.0 MHz to a spill channel at 98.2 MHz. Accepting strongest-first fixed it. Measured
+on an eight-station band, the scan finds 8 of 8 with no false positives, and the lower quartile
+estimates the noise floor to within 0.2 dB where the median is 43 dB out.
 
 ## Phase 3 — v0.2 · FM demodulation and playback
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 23 | ⬜ | `fm_demodulator` | Quadrature demodulation, decimation, 50 µs de-emphasis |
-| 24 | ⬜ | Stereo decoding | 19 kHz pilot, 38 kHz subcarrier, L/R matrixing |
-| 25 | ⬜ | Audio chain | Resample to 48 kHz, PCM output |
+| 23 | ✅ | `fm_demodulator` | Quadrature demodulation, decimation, 50 µs de-emphasis |
+| 24 | ✅ | Stereo decoding | 19 kHz pilot, 38 kHz subcarrier, L/R matrixing |
+| 25 | ✅ | Audio chain | Resample to 48 kHz, PCM output |
 | 26 | ⬜ | libVLC integration | `python-vlc` playing a local stream fed by the demodulator |
-| 27 | ⬜ | Tests | Modulate a 1 kHz tone, demodulate, assert frequency and distortion |
+| 27 | ✅ | Tests | Modulate a 1 kHz tone, demodulate, assert frequency and distortion |
 | 28 | ⬜ 🟢 | CLI `openwave listen 98.0` | Tune and play one frequency |
+
+**Where Phase 3 stands.** Demodulation, stereo decoding and the audio chain are done, and the
+stereo flag in a scan comes from an actual pilot measurement. One finding worth recording: the
+demodulation rate has to be sized for the *modulated* signal, not for the multiplex inside it.
+Carson's rule makes a full-deviation stereo transmission 270 kHz wide, so decimating to 240 kHz
+clipped its outer sidebands, and the clipping imitated a stereo pilot well enough that a mono
+station was confidently reported as stereo. 480 kHz leaves about 60 dB of margin. Filter lengths
+are now derived from the transition width they have to achieve, after a 129-tap low-pass at
+15 kHz turned out to leave the 19 kHz pilot almost untouched. Remaining: libVLC playback and the
+`listen` command.
 
 ## Phase 4 — v0.3 · RDS decoding
 
