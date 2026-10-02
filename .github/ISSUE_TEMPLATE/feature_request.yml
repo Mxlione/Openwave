@@ -1,0 +1,50 @@
+name: ✨ Feature request
+description: Suggest a capability or an improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: Describe the need, not the solution, first.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: How you imagine it working. A sketched CLI call or API response helps.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of OpenWave
+      options:
+        - core (scanning engine)
+        - radio (FM, RDS)
+        - tv (DVB-T)
+        - sdr (receiver access)
+        - media (FFmpeg, libVLC)
+        - api
+        - frontend (Angular)
+        - docs / tooling
+        - not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including existing tools that already do this.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This concerns public, freely accessible broadcasts only — it does not involve bypassing encryption or conditional access.
+          required: true

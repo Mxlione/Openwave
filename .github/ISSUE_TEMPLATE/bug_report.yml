@@ -1,0 +1,65 @@
+name: 🐛 Bug report
+description: Something behaves incorrectly or crashes.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the problem happens with a **physical receiver**, please use the
+        **📡 Hardware report** template instead — it asks for the details we need.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The exact command or code, and any input needed.
+      placeholder: |
+        1. openwave scan fm --device mock
+        2. ...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Output or traceback
+      description: Paste the full traceback if there is one.
+      render: shell
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Receiver in use
+      options:
+        - Simulated device (mock)
+        - RTL-SDR
+        - DVB-T tuner
+        - Other SDR (SoapySDR)
+        - Not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: OpenWave version or commit
+      placeholder: "0.1.0.dev0, or the commit SHA"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Python version
+      placeholder: "Ubuntu 24.04, Python 3.12.3"
+    validations:
+      required: true

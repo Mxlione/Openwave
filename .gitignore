@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+venv/
+.venv/
+env/
+
+# Testing / typing / linting
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# OpenWave signal captures (large binary files, never commit)
+*.cf32
+*.iq
+*.sigmf-data
+*.ts
+!tests/data/**/*.ts
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Docs build
+site/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

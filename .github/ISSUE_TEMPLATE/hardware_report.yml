@@ -1,0 +1,81 @@
+name: 📡 Hardware report
+description: Report how OpenWave behaves with a real receiver. The most useful report you can file.
+labels: ["hardware validation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The maintainer has no RTL-SDR dongle and no DVB-T tuner, so the real drivers have never run
+        on physical hardware. **Any** result is valuable here — including a crash, or "it worked".
+        Thank you for taking the time.
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options:
+        - ✅ Worked as expected
+        - ⚠️ Worked, but with wrong or suspicious results
+        - ❌ Failed or crashed
+        - 🔌 Device was not detected at all
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Receiver
+      description: Model and chipset if you know it.
+      placeholder: "RTL-SDR Blog V4 (R828D + RTL2832U)"
+    validations:
+      required: true
+
+  - type: input
+    id: antenna
+    attributes:
+      label: Antenna and setup
+      placeholder: "Telescopic dipole, indoor, near a window"
+
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      render: shell
+      placeholder: "openwave scan fm --device rtlsdr"
+    validations:
+      required: true
+
+  - type: textarea
+    id: result
+    attributes:
+      label: Full output
+      description: Paste everything, including the traceback if it failed.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: ground-truth
+    attributes:
+      label: What you know is actually on the air
+      description: >
+        If you can, list the stations or channels you know exist at your location, with their
+        frequencies. This lets us tell a real detection from a false positive.
+      placeholder: |
+        89.1 MHz  - Station A (strong)
+        95.6 MHz  - Station B (weak)
+
+  - type: input
+    id: environment
+    attributes:
+      label: OS, Python version, OpenWave commit
+      placeholder: "Fedora 40, Python 3.12, commit abc1234"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: capture
+    attributes:
+      label: IQ capture
+      options:
+        - label: I can share a short IQ capture if that would help debug this.
