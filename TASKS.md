@@ -224,7 +224,7 @@ Decisions worth recording:
 | 50 | ⬜ | FM station view | List, frequency, strength, RDS name, Listen button |
 | 51 | ⬜ | TV channel view | Grouped by multiplex, Watch button |
 | 52 | ⬜ 🟢 | Signal meter | Strength and SNR gauge |
-| 53 | ⬜ | Favourites | Server-side persistence |
+| 53 | 🟡 | Favourites | Server-side persistence done; the interface for them comes with the Angular views |
 | 54 | ⬜ | Frontend CI | Angular build verified, served statically by FastAPI |
 
 ## Phase 8 — v0.7 · Real-time spectrum

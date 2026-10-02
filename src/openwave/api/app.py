@@ -26,6 +26,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from openwave import __version__
+from openwave.api.favourites import Favourite, FavouriteKind, FavouriteStore
 from openwave.api.models import (
     Band,
     Capabilities,
@@ -74,6 +75,7 @@ def create_app(
     tuner_spec: str = "mockdvb",
     device_factory: Callable[[str], SdrDevice] | None = None,
     tuner_factory: Callable[[str], Any] | None = None,
+    favourite_store: FavouriteStore | None = None,
 ) -> FastAPI:
     """Build the API.
 
@@ -83,6 +85,8 @@ def create_app(
         device_factory: How to build a receiver from a specification. Replaceable so that a
             test, or the demonstration mode, can supply a populated simulator.
         tuner_factory: The same for tuners.
+        favourite_store: Where to keep favourites. Replaceable so a test does not write to
+            the user's real list.
     """
     open_receiver = device_factory or open_device
     open_tuner = tuner_factory or open_dvb_device
@@ -95,6 +99,7 @@ def create_app(
     )
     streamer = AudioStreamer(device_factory=lambda: open_receiver(device_spec))
     spectrum = SpectrumStreamer(device_factory=lambda: open_receiver(device_spec))
+    favourites = favourite_store if favourite_store is not None else FavouriteStore()
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -123,11 +128,18 @@ def create_app(
     app.state.manager = manager
     app.state.streamer = streamer
     app.state.spectrum = spectrum
+    app.state.favourites = favourites
     app.state.device_spec = device_spec
     app.state.tuner_spec = tuner_spec
 
     _register_error_handlers(app)
-    _register_routes(app, manager=manager, streamer=streamer, spectrum=spectrum)
+    _register_routes(
+        app,
+        manager=manager,
+        streamer=streamer,
+        spectrum=spectrum,
+        favourites=favourites,
+    )
     return app
 
 
@@ -173,6 +185,7 @@ def _register_routes(
     manager: ScanManager,
     streamer: AudioStreamer,
     spectrum: SpectrumStreamer,
+    favourites: FavouriteStore,
 ) -> None:
     """Attach every route to the application."""
 
@@ -315,6 +328,47 @@ def _register_routes(
             "frequency_hz": streamer.frequency_hz,
             "listeners": streamer.listener_count,
         }
+
+    @app.get(f"{API_PREFIX}/favourites", response_model=list[Favourite], tags=["favourites"])
+    async def list_favourites(kind: FavouriteKind | None = None) -> list[Favourite]:
+        """Every remembered station and channel, in frequency order.
+
+        Kept by the server rather than the browser: a receiver is a thing in a room, reached
+        from a laptop, a phone and a television, and a list held in one browser's storage is
+        invisible to the other two.
+        """
+        return favourites.all(kind)
+
+    @app.post(
+        f"{API_PREFIX}/favourites",
+        response_model=Favourite,
+        status_code=status.HTTP_201_CREATED,
+        tags=["favourites"],
+    )
+    async def add_favourite(favourite: Favourite) -> Favourite:
+        """Remember a station or channel.
+
+        Adding something already remembered replaces it, so a renamed station keeps its place
+        rather than appearing twice.
+        """
+        try:
+            return favourites.add(favourite)
+        except ValueError as error:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+
+    @app.delete(
+        f"{API_PREFIX}/favourites",
+        status_code=status.HTTP_204_NO_CONTENT,
+        tags=["favourites"],
+    )
+    async def remove_favourite(favourite: Favourite) -> None:
+        """Forget a station or channel.
+
+        Forgetting something that was not remembered is not an error: a client that sends the
+        same request twice, or that is out of step with another client, should end up with the
+        state it asked for rather than an error to handle.
+        """
+        favourites.remove(favourite)
 
     @app.websocket(f"{API_PREFIX}/ws/spectrum")
     async def spectrum_feed(
