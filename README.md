@@ -66,7 +66,7 @@ OpenWave is in early development. Nothing is released yet.
 | Simulated devices (synthetic IQ, MPEG-TS replay) | 🟢 in place |
 | FM band scan (v0.1) | 🟢 in place |
 | FM demodulation and playback (v0.2) | 🟢 in place |
-| RDS decoding (v0.3) | 🔴 not started |
+| RDS decoding (v0.3) | 🟢 in place |
 | DVB-T scan (v0.4) | 🔴 not started |
 | HTTP API (v0.5) | 🔴 not started |
 | Angular interface (v0.6) | 🔴 not started |
@@ -154,8 +154,10 @@ OpenWave/
 │   │
 │   ├── radio/             # FM radio
 │   │   ├── fm_demodulator.py
-│   │   ├── rds_decoder.py
-│   │   └── station_detector.py
+│   │   ├── listener.py
+│   │   ├── station_detector.py
+│   │   ├── synthesis.py   # Synthetic transmissions, for testing without hardware
+│   │   └── rds/           # RDS: blocks, groups, encoder, decoder
 │   │
 │   ├── tv/                # Digital television
 │   │   ├── dvb_scanner.py
@@ -171,9 +173,9 @@ OpenWave/
 │   │   └── device_manager.py
 │   │
 │   ├── media/             # Processing and playback
-│   │   ├── ffmpeg.py
-│   │   ├── codecs.py
-│   │   └── libvlc.py
+│   │   ├── libvlc.py
+│   │   ├── stream.py
+│   │   └── wav.py
 │   │
 │   ├── api/               # HTTP + WebSocket API
 │   │   ├── scan.py

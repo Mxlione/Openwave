@@ -10,6 +10,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from openwave.core.units import format_frequency
+from openwave.radio.rds.groups import ProgrammeType
 
 
 class Station(BaseModel):
@@ -41,13 +42,37 @@ class Station(BaseModel):
     name: str | None = Field(
         default=None,
         max_length=64,
-        description="Station name from RDS. Always None until RDS decoding lands in v0.3.",
+        description="Station name, from the RDS programme service field.",
+    )
+    pi: int | None = Field(
+        default=None,
+        ge=0,
+        le=0xFFFF,
+        description=(
+            "RDS programme identification: a 16-bit code identifying the station within its "
+            "country. Transmitters carrying the same programme share it, which is how a "
+            "receiver follows a station across frequencies."
+        ),
+    )
+    pty: int | None = Field(
+        default=None,
+        ge=0,
+        le=31,
+        description=(
+            "RDS programme type, as the raw five-bit number. Europe and North America assign "
+            "the same bits to different genres, so the number is kept rather than a label."
+        ),
+    )
+    radio_text: str | None = Field(
+        default=None,
+        max_length=64,
+        description="RDS RadioText: a longer free-text field, often the programme or track.",
     )
 
-    @field_validator("name")
+    @field_validator("name", "radio_text")
     @classmethod
     def _strip_name(cls, value: str | None) -> str | None:
-        """Trim an RDS name, and treat an all-blank one as absent.
+        """Trim RDS text, and treat an all-blank value as absent.
 
         RDS pads names to eight characters with spaces, and a transmitter sending nothing but
         padding should read as "no name" rather than as a station called "        ".
@@ -71,6 +96,11 @@ class Station(BaseModel):
     def label(self) -> str:
         """The best available name for display: the RDS name, else the frequency."""
         return self.name or f"{self.freq_mhz:.1f} MHz"
+
+    @property
+    def programme_type(self) -> ProgrammeType | None:
+        """The programme type as a European assignment, if one was received."""
+        return None if self.pty is None else ProgrammeType(self.pty)
 
     def __str__(self) -> str:
         parts = [format_frequency(self.freq_hz), f"{self.snr_db:+.1f} dB"]

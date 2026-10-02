@@ -7,6 +7,10 @@ a station list on a machine with no hardware attached.
 The stations are invented. The point is a believable spread: strong and weak, stereo and mono,
 one near each end of the band, and a weak station close to a strong one -- which is the case
 that catches a scanner reporting its neighbour's spill as a station of its own.
+
+Every one of them carries RDS, so ``--demo`` shows station names as a real scan would. The
+names are eight characters or fewer because that is all RDS allows; a longer one would be
+truncated on the air, which looks like a bug in the decoder rather than a limit of the standard.
 """
 
 from __future__ import annotations
@@ -38,7 +42,7 @@ DEMO_FM_STATIONS: Final = (
         freq_hz=101_700_000.0, power_dbfs=-28.0, stereo=True, right_tone_hz=500.0, name="CITY FM"
     ),
     SyntheticFmStation(freq_hz=104_300_000.0, power_dbfs=-33.0, name="TALK 104"),
-    SyntheticFmStation(freq_hz=107_900_000.0, power_dbfs=-30.0, name="BAND EDGE"),
+    SyntheticFmStation(freq_hz=107_900_000.0, power_dbfs=-30.0, name="EDGE FM"),
 )
 
 

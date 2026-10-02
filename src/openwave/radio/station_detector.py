@@ -26,11 +26,14 @@ from openwave.core.signal_detector import ChannelMeasurement
 from openwave.radio.band import FM_BAND_PLAN
 from openwave.radio.fm_demodulator import (
     MPX_SAMPLE_RATE_HZ,
+    RealSignal,
     decimate_to,
     pilot_level_db,
     quadrature_demodulate,
     shift_to_baseband,
 )
+from openwave.radio.rds.decoder import decode_rds
+from openwave.radio.rds.groups import RdsData
 from openwave.radio.station import Station
 from openwave.sdr.device import SdrDevice
 
@@ -47,6 +50,17 @@ DC_AVOIDANCE_OFFSET_HZ = 250_000.0
 #: 2.4 MS/s this is about 110 ms.
 DEFAULT_IDENTIFY_SAMPLES = 1 << 18
 
+#: Seconds of signal read per station when reading RDS.
+#:
+#: A station's name arrives two characters at a time, in group 0A, interleaved with
+#: whatever else the station is sending. One group takes 87.6 ms, and the four groups
+#: carrying the name are spread through the sequence, so a complete name needs about a
+#: second. Measured against the simulator: 0.8 s gives no name, 1.0 s gives one.
+#:
+#: This is the dominant cost of a scan. Thirty stations at 1.2 seconds each is well
+#: over half a minute, which is why it can be switched off.
+DEFAULT_RDS_SECONDS = 1.2
+
 #: Called with the station index, the total, and the frequency, before each is examined.
 ProgressCallback = Callable[[int, int, float], None]
 
@@ -62,18 +76,26 @@ class IdentifySettings:
             count as stereo.
         dc_avoidance_offset_hz: Where to place the station within the window. See
             :data:`DC_AVOIDANCE_OFFSET_HZ`.
+        rds: Whether to read RDS, which is what fills in a station's name. It needs
+            about a second of signal per station, so it dominates how long a scan
+            takes.
+        rds_seconds: How long to listen for RDS. See :data:`DEFAULT_RDS_SECONDS`.
     """
 
     samples: int = DEFAULT_IDENTIFY_SAMPLES
     settling_samples: int = DEFAULT_SETTLING_SAMPLES
     stereo_threshold_db: float = 10.0
     dc_avoidance_offset_hz: float = DC_AVOIDANCE_OFFSET_HZ
+    rds: bool = True
+    rds_seconds: float = DEFAULT_RDS_SECONDS
 
     def __post_init__(self) -> None:
         if self.samples <= 0:
             raise ValueError(f"samples must be positive, got {self.samples}")
         if self.settling_samples < 0:
             raise ValueError(f"settling_samples must not be negative, got {self.settling_samples}")
+        if self.rds and self.rds_seconds <= 0:
+            raise ValueError(f"rds_seconds must be positive, got {self.rds_seconds}")
 
 
 def station_from_measurement(
@@ -81,12 +103,13 @@ def station_from_measurement(
     *,
     stereo: bool | None = None,
     pilot_level_db: float | None = None,
-    name: str | None = None,
+    rds: RdsData | None = None,
 ) -> Station:
     """Build a :class:`Station` from a channel measurement.
 
     ``stereo`` stays ``None`` when it was not checked, which is different from ``False``: a
-    sweep on its own cannot tell a mono station from one it never demodulated.
+    sweep on its own cannot tell a mono station from one it never demodulated. The same
+    goes for ``rds``: no RDS data means it was not read, or the station sends none.
     """
     return Station(
         freq_hz=measurement.freq_hz,
@@ -95,7 +118,10 @@ def station_from_measurement(
         bandwidth_hz=measurement.bandwidth_hz,
         stereo=stereo,
         pilot_level_db=pilot_level_db,
-        name=name,
+        name=None if rds is None else rds.programme_service,
+        pi=None if rds is None else rds.pi,
+        pty=None if rds is None else rds.pty,
+        radio_text=None if rds is None else rds.radio_text,
     )
 
 
@@ -129,7 +155,13 @@ def examine_station(
     device.set_center_freq(center_freq_hz)
     if settings.settling_samples:
         device.read_samples(settings.settling_samples)
-    samples = device.read_samples(settings.samples)
+
+    # One read serves both measurements. RDS needs far more signal than the pilot
+    # does, so the larger budget wins and the multiplex is demodulated once.
+    wanted = settings.samples
+    if settings.rds:
+        wanted = max(wanted, round(settings.rds_seconds * device.sample_rate_hz))
+    samples = device.read_samples(wanted)
 
     shifted = shift_to_baseband(samples, offset_hz=offset_hz, sample_rate_hz=device.sample_rate_hz)
     baseband, mpx_rate_hz = decimate_to(
@@ -137,18 +169,35 @@ def examine_station(
     )
     mpx = quadrature_demodulate(baseband, sample_rate_hz=mpx_rate_hz)
 
+    rds_data = _read_rds(mpx, mpx_rate_hz) if settings.rds else None
+
     try:
         pilot_db = pilot_level_db(mpx, sample_rate_hz=mpx_rate_hz)
     except ValueError:
         # Too few samples, or a rate too low to represent 19 kHz. Report the measurement and
         # leave stereo unknown rather than guessing.
-        return station_from_measurement(measurement)
+        return station_from_measurement(measurement, rds=rds_data)
 
     return station_from_measurement(
         measurement,
         stereo=pilot_db >= settings.stereo_threshold_db,
         pilot_level_db=pilot_db,
+        rds=rds_data,
     )
+
+
+def _read_rds(mpx: RealSignal, mpx_rate_hz: float) -> RdsData | None:
+    """Decode RDS from a multiplex, reporting nothing rather than failing a scan.
+
+    A station that sends no RDS, or whose subcarrier is too weak to read, is the common case
+    and not an error. Returning ``None`` for it keeps "no RDS" distinct from "RDS read, and the
+    station has no name", which is a real if unusual state.
+    """
+    try:
+        data = decode_rds(mpx, sample_rate_hz=mpx_rate_hz)
+    except ValueError:
+        return None
+    return data if data.groups_decoded else None
 
 
 def identify_stations(

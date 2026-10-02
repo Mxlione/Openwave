@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from openwave.core.scanner import ScanSettings
 from openwave.core.signal_detector import ChannelMeasurement
 from openwave.radio.demo import DEMO_FM_STATIONS, demo_receiver
+from openwave.radio.rds import RdsProgramme
 from openwave.radio.station import Station
 from openwave.radio.station_detector import (
     IdentifySettings,
@@ -26,7 +27,9 @@ from openwave.sdr.device import TuningRange
 from openwave.sdr.mock import MockSdrDevice
 
 QUICK = ScanSettings(samples_per_segment=1 << 14, settling_samples=0, fft_size=2048)
-QUICK_IDENTIFY = IdentifySettings(samples=1 << 18, settling_samples=0)
+# RDS off by default in these tests: reading it needs a second of signal per station,
+# which would make the whole suite minutes slower. The RDS path has its own tests.
+QUICK_IDENTIFY = IdentifySettings(samples=1 << 18, settling_samples=0, rds=False)
 
 
 def measurement(freq_hz: float = 98e6, snr_db: float = 40.0) -> ChannelMeasurement:
@@ -182,7 +185,7 @@ class TestExamineStation:
             station = examine_station(
                 device,
                 measurement(98e6),
-                settings=IdentifySettings(samples=2048, settling_samples=0),
+                settings=IdentifySettings(samples=2048, settling_samples=0, rds=False),
             )
         assert station.stereo is None
 
@@ -225,6 +228,86 @@ class TestIdentifyStations:
         with device:
             device.set_sample_rate(2.4e6)
             assert identify_stations(device, [], settings=QUICK_IDENTIFY) == ()
+
+
+class TestRdsThroughAScan:
+    """RDS is what turns "98.0 MHz" into a station with a name."""
+
+    def test_a_station_name_is_read_from_the_air(self) -> None:
+        device = MockSdrDevice(
+            sources=[
+                SyntheticFmStation(
+                    freq_hz=98e6,
+                    power_dbfs=-20.0,
+                    rds=RdsProgramme(
+                        pi=0xF201, programme_service="OPENWAVE", pty=10, radio_text="Testing"
+                    ),
+                )
+            ],
+            noise_floor_dbfs=-80.0,
+        )
+        with device:
+            device.set_sample_rate(2.4e6)
+            station = examine_station(
+                device,
+                measurement(98e6),
+                settings=IdentifySettings(settling_samples=0, rds=True, rds_seconds=1.2),
+            )
+
+        assert station.name == "OPENWAVE"
+        assert station.pi == 0xF201
+        assert station.pty == 10
+        assert station.radio_text == "Testing"
+
+    def test_a_station_without_rds_reports_no_name(self) -> None:
+        # The common case, and it must not read as a decoder failure.
+        device = MockSdrDevice(
+            sources=[SyntheticFmStation(freq_hz=98e6, power_dbfs=-20.0)],
+            noise_floor_dbfs=-80.0,
+        )
+        with device:
+            device.set_sample_rate(2.4e6)
+            station = examine_station(
+                device,
+                measurement(98e6),
+                settings=IdentifySettings(settling_samples=0, rds=True, rds_seconds=1.2),
+            )
+        assert station.name is None
+        assert station.pi is None
+
+    def test_switching_rds_off_leaves_the_name_unknown(self) -> None:
+        device = MockSdrDevice(
+            sources=[SyntheticFmStation(freq_hz=98e6, power_dbfs=-20.0, name="OPENWAVE")],
+            noise_floor_dbfs=-80.0,
+        )
+        with device:
+            device.set_sample_rate(2.4e6)
+            station = examine_station(
+                device, measurement(98e6), settings=IdentifySettings(settling_samples=0, rds=False)
+            )
+        assert station.name is None
+        # Stereo is still decided, because that needs only a fraction of the signal.
+        assert station.stereo is not None
+
+    def test_too_short_a_listen_gives_no_name_rather_than_a_partial_one(self) -> None:
+        # A name arrives two characters at a time. Publishing fragments would spell a station's
+        # name wrongly on screen for the second before the rest arrives.
+        device = MockSdrDevice(
+            sources=[SyntheticFmStation(freq_hz=98e6, power_dbfs=-20.0, name="OPENWAVE")],
+            noise_floor_dbfs=-80.0,
+        )
+        with device:
+            device.set_sample_rate(2.4e6)
+            station = examine_station(
+                device,
+                measurement(98e6),
+                settings=IdentifySettings(settling_samples=0, rds=True, rds_seconds=0.3),
+            )
+        assert station.name is None
+
+    def test_a_non_positive_rds_duration_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="rds_seconds must be positive"):
+            IdentifySettings(rds=True, rds_seconds=0.0)
 
 
 class TestScanFm:

@@ -106,12 +106,36 @@ timeout.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 29 | ⬜ | **Synthetic RDS encoder** | Required to test without hardware: injects a real RDS signal into the mock |
-| 30 | ⬜ | 57 kHz extraction | Filtering, BPSK demodulation, clock recovery, differential decoding |
-| 31 | ⬜ | Error correction | 26-bit blocks, offset words, CRC |
-| 32 | ⬜ | Group parsing | PI, PTY, 0A/0B (station name), 2A (RadioText) |
-| 33 | ⬜ | Wire into the model | The RDS name fills `Station.name` during a scan |
-| 34 | ⬜ | Tests | Encoder → decoder round trip, name and RadioText recovered exactly |
+| 29 | ✅ | **Synthetic RDS encoder** | Required to test without hardware: injects a real RDS signal into the mock |
+| 30 | ✅ | 57 kHz extraction | Filtering, BPSK demodulation, clock recovery, differential decoding |
+| 31 | ✅ | Error correction | 26-bit blocks, offset words, CRC |
+| 32 | ✅ | Group parsing | PI, PTY, 0A/0B (station name), 2A (RadioText) |
+| 33 | ✅ | Wire into the model | The RDS name fills `Station.name` during a scan |
+| 34 | ✅ | Tests | Encoder → decoder round trip, name and RadioText recovered exactly |
+
+**What Phase 4 delivered.** A scan now reports what stations are called. `openwave scan fm
+--demo` shows OPENWAVE, CITY FM and the rest, read off a 57 kHz subcarrier rather than written
+into the output.
+
+Three things worth recording:
+
+- **Synchronisation is acquired on undamaged blocks and kept with repair allowed.** The check
+  word repairs a burst of up to five bits, which means about a third of all syndromes map to
+  some correctable error — so a decoder that repairs while *searching* will repair noise into
+  four plausible blocks in a row. Measured on pure noise before the fix: 22 groups, every one
+  invented, with the station's identity different in each.
+- **The subcarrier's phase is recovered from the data, not from the stereo pilot.** Locking to
+  the pilot's third harmonic is the textbook approach and works only for stereo stations; a mono
+  station carries RDS perfectly well. The data is real, so its samples lie along a line, and
+  squaring them reveals the angle. Verified on a mono transmission with no pilot at all.
+- **RDS is generated as one cached period rather than a stream.** Data has no closed-form
+  integral, which the FM synthesiser needs to stay exactly reproducible — but it is periodic,
+  so one period and its integral are computed once and indexed into. The simulator's
+  bit-for-bit reproducibility under re-chunking survives with RDS switched on.
+
+And one bug the tests caught: `rds_text` mapped everything outside printable ASCII to a space,
+including the carriage return that marks where a RadioText message ends — so a short message was
+never trimmed and appeared padded with the remains of the previous one.
 
 ## Phase 5 — v0.4 · DVB-T scan
 

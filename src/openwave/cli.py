@@ -24,7 +24,7 @@ from openwave.radio.band import FM_BAND_PLAN, FM_BAND_PLANS
 from openwave.radio.demo import demo_receiver
 from openwave.radio.listener import FmListener, ListenSettings
 from openwave.radio.station import Station
-from openwave.radio.station_detector import FmScanResult, scan_fm
+from openwave.radio.station_detector import FmScanResult, IdentifySettings, scan_fm
 from openwave.sdr import DeviceError, list_devices, open_device
 from openwave.sdr.device_manager import describe_device, driver_names
 
@@ -168,6 +168,16 @@ def scan_fm_command(
             help="Demodulate each station to decide stereo. Skipping it is quicker.",
         ),
     ] = True,
+    rds: Annotated[
+        bool,
+        typer.Option(
+            "--rds/--no-rds",
+            help=(
+                "Read RDS to get each station's name. Needs about a second of signal per "
+                "station, so it is what makes a scan slow."
+            ),
+        ),
+    ] = True,
     demo: Annotated[
         bool,
         typer.Option(
@@ -197,7 +207,7 @@ def scan_fm_command(
             if not as_json:
                 label = "an invented band" if demo else escape(receiver.info.label)
                 console.print(f"Scanning {plan} with [bold]{label}[/bold]")
-            result = _run_scan(receiver, plan, settings, stereo=stereo, quiet=as_json)
+            result = _run_scan(receiver, plan, settings, stereo=stereo, rds=rds, quiet=as_json)
     except DeviceError as error:
         errors.print(f"[red]{type(error).__name__}:[/red] {escape(str(error))}")
         raise typer.Exit(1) from error
@@ -220,11 +230,24 @@ def _band_plan(name: str) -> BandPlan:
 
 
 def _run_scan(
-    receiver: Any, plan: BandPlan, settings: ScanSettings, *, stereo: bool, quiet: bool
+    receiver: Any,
+    plan: BandPlan,
+    settings: ScanSettings,
+    *,
+    stereo: bool,
+    rds: bool,
+    quiet: bool,
 ) -> FmScanResult:
     """Run a scan, with a progress bar unless output is meant to be machine-readable."""
+    identify_settings = IdentifySettings(rds=rds)
     if quiet:
-        return scan_fm(receiver, plan=plan, scan_settings=settings, identify=stereo)
+        return scan_fm(
+            receiver,
+            plan=plan,
+            scan_settings=settings,
+            identify_settings=identify_settings,
+            identify=stereo,
+        )
 
     with Progress(
         SpinnerColumn(),
@@ -240,19 +263,22 @@ def _run_scan(
         def on_sweep(index: int, total: int, segment: object) -> None:
             progress.update(sweep, completed=index, total=total)
 
+        label = "Reading RDS" if rds else "Checking stereo"
+
         def on_identify(index: int, total: int, freq_hz: float) -> None:
             progress.update(
                 identify,
                 completed=index,
                 total=total,
                 visible=True,
-                description=f"Checking stereo at {format_frequency(freq_hz)}",
+                description=f"{label} at {format_frequency(freq_hz)}",
             )
 
         return scan_fm(
             receiver,
             plan=plan,
             scan_settings=settings,
+            identify_settings=identify_settings,
             identify=stereo,
             sweep_progress=on_sweep,
             identify_progress=on_identify,
@@ -295,7 +321,11 @@ def _print_stations(result: FmScanResult) -> None:
     console.print(table)
     console.print(f"[dim]{result}[/dim]")
     if not named:
-        console.print("[dim]Station names arrive with RDS decoding in v0.3.[/dim]")
+        console.print(
+            "[dim]No station names: none of these stations carry readable RDS. Pass "
+            "[/dim]--rds[dim] if it was switched off, and note that a weak signal often "
+            "carries a signal strong enough to hear but too weak to decode.[/dim]"
+        )
     if not result.scan.is_complete:
         console.print(
             f"[yellow]Only {result.scan.coverage:.0%} of the band was reachable[/yellow] "

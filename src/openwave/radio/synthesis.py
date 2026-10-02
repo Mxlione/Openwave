@@ -33,11 +33,13 @@ from openwave.core.units import dbfs_to_amplitude
 from openwave.radio.constants import (
     FM_MAX_DEVIATION_HZ,
     FM_MPX_BANDWIDTH_HZ,
+    RDS_DEVIATION_SHARE,
     STEREO_AUDIO_DEVIATION_SHARE,
     STEREO_PILOT_DEVIATION_SHARE,
     STEREO_PILOT_HZ,
     STEREO_SUBCARRIER_HZ,
 )
+from openwave.radio.rds.encoder import RdsBaseband, RdsProgramme, rds_baseband_period
 from openwave.sdr.device import IqSamples
 
 
@@ -81,8 +83,12 @@ class SyntheticFmStation:
         stereo: Whether to transmit a stereo multiplex, with the 19 kHz pilot and the 38 kHz
             difference subcarrier, rather than plain mono audio.
         deviation_hz: Peak carrier deviation.
-        name: The station name this transmitter would send over RDS. Ignored for now: RDS
-            synthesis lands in v0.3 (task 29). It is here because it makes tests readable.
+        name: The station name to send over RDS. Setting it makes the transmission carry an
+            RDS subcarrier, so a decoder can read the name back. ``None`` sends no RDS, which
+            is what a station without it looks like.
+        rds: Full control over what the RDS carries, for a test that needs a particular
+            programme identification, programme type or RadioText. Takes precedence over
+            :attr:`name`.
     """
 
     freq_hz: float
@@ -92,10 +98,16 @@ class SyntheticFmStation:
     stereo: bool = False
     deviation_hz: float = FM_MAX_DEVIATION_HZ
     name: str | None = None
+    rds: RdsProgramme | None = None
 
     #: Cached multiplex expansion, filled on first use. Excluded from equality and repr.
     _tones: list[Tone] = field(
         default_factory=list, init=False, repr=False, compare=False, hash=False
+    )
+
+    #: Cached RDS baseband, one repeat of the group sequence, keyed by sample rate.
+    _rds_cache: dict[float, RdsBaseband] = field(
+        default_factory=dict, init=False, repr=False, compare=False, hash=False
     )
 
     def __post_init__(self) -> None:
@@ -121,6 +133,20 @@ class SyntheticFmStation:
         return dbfs_to_amplitude(self.power_dbfs)
 
     @property
+    def rds_programme(self) -> RdsProgramme | None:
+        """What this station transmits over RDS, or ``None`` if it transmits none."""
+        if self.rds is not None:
+            return self.rds
+        if self.name is not None:
+            return RdsProgramme(programme_service=self.name)
+        return None
+
+    @property
+    def carries_rds(self) -> bool:
+        """Whether this transmission includes an RDS subcarrier."""
+        return self.rds_programme is not None
+
+    @property
     def occupied_bandwidth_hz(self) -> float:
         """Bandwidth the transmission occupies, by Carson's rule.
 
@@ -128,8 +154,16 @@ class SyntheticFmStation:
         about 98% of the transmitted power, which is the usual engineering definition of
         occupied bandwidth.
         """
-        highest_baseband_hz = FM_MPX_BANDWIDTH_HZ if self.stereo else self.left_tone_hz
+        if self.stereo or self.carries_rds:
+            highest_baseband_hz = FM_MPX_BANDWIDTH_HZ
+        else:
+            highest_baseband_hz = self.left_tone_hz
         return 2.0 * (self.deviation_hz + highest_baseband_hz)
+
+    @property
+    def _tone_share(self) -> float:
+        """How much of the deviation the tones may use, leaving room for RDS."""
+        return 1.0 - RDS_DEVIATION_SHARE if self.carries_rds else 1.0
 
     def mpx_tones(self) -> tuple[Tone, ...]:
         """The baseband multiplex, expanded into sinusoids.
@@ -145,7 +179,7 @@ class SyntheticFmStation:
         between the components -- which is what a stereo detector actually keys on.
         """
         if not self._tones:
-            self._tones.extend(_normalise(self._raw_mpx_tones()))
+            self._tones.extend(_normalise(self._raw_mpx_tones(), total=self._tone_share))
         return tuple(self._tones)
 
     def _raw_mpx_tones(self) -> list[Tone]:
@@ -207,13 +241,40 @@ class SyntheticFmStation:
         if start_index < 0:
             raise ValueError(f"start index must not be negative, got {start_index}")
 
-        t: npt.NDArray[np.float64] = (
-            start_index + np.arange(count, dtype=np.float64)
-        ) / sample_rate_hz
+        indices = start_index + np.arange(count, dtype=np.int64)
+        t: npt.NDArray[np.float64] = indices.astype(np.float64) / sample_rate_hz
         offset_hz = self.freq_hz - center_freq_hz
         phase = 2.0 * np.pi * offset_hz * t + self._fm_phase(t)
+        phase = phase + self._rds_phase(indices, sample_rate_hz=sample_rate_hz)
         iq: IqSamples = (self.amplitude * np.exp(1j * phase)).astype(np.complex64)
         return iq
+
+    def _rds_phase(
+        self, indices: npt.NDArray[np.int64], *, sample_rate_hz: float
+    ) -> npt.NDArray[np.float64]:
+        """Phase contributed by the RDS subcarrier, or zeros for a station without one.
+
+        Unlike the tones, RDS data has no closed-form integral, so one period of the subcarrier
+        and of its integral is generated once and looked into by sample index. That keeps the
+        signal exactly reproducible: the same index always gives the same phase, however the
+        reads are chunked.
+        """
+        programme = self.rds_programme
+        if programme is None:
+            return np.zeros(indices.size, dtype=np.float64)
+
+        baseband = self._rds_baseband(programme, sample_rate_hz=sample_rate_hz)
+        deviation_hz = self.deviation_hz * RDS_DEVIATION_SHARE
+        phase: npt.NDArray[np.float64] = 2.0 * np.pi * deviation_hz * baseband.phase_at(indices)
+        return phase
+
+    def _rds_baseband(self, programme: RdsProgramme, *, sample_rate_hz: float) -> RdsBaseband:
+        """One period of this station's RDS subcarrier, generated once and kept."""
+        cached = self._rds_cache.get(sample_rate_hz)
+        if cached is None:
+            cached = rds_baseband_period(programme, sample_rate_hz=sample_rate_hz)
+            self._rds_cache[sample_rate_hz] = cached
+        return cached
 
     def _fm_phase(self, t: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Phase contributed by the modulation, evaluated directly from the closed-form integral.
@@ -230,12 +291,17 @@ class SyntheticFmStation:
         return self.deviation_hz * phase
 
 
-def _normalise(tones: list[Tone]) -> list[Tone]:
-    """Scale tones so the magnitudes of their amplitudes sum to 1."""
-    total = sum(abs(tone.amplitude) for tone in tones)
-    if total == 0:
+def _normalise(tones: list[Tone], *, total: float = 1.0) -> list[Tone]:
+    """Scale tones so the magnitudes of their amplitudes sum to ``total``.
+
+    ``total`` is less than one for a station carrying RDS, which needs its own share of the
+    deviation. Without that, adding RDS would push the peak deviation past what was asked for.
+    """
+    current = sum(abs(tone.amplitude) for tone in tones)
+    if current == 0:
         raise ValueError("multiplex has no energy")
+    scale = total / current
     return [
-        Tone(freq_hz=tone.freq_hz, amplitude=tone.amplitude / total, phase_rad=tone.phase_rad)
+        Tone(freq_hz=tone.freq_hz, amplitude=tone.amplitude * scale, phase_rad=tone.phase_rad)
         for tone in tones
     ]

@@ -108,12 +108,12 @@ class TestScanFm:
             assert frequency in text
 
     def test_it_reports_which_stations_are_stereo(self) -> None:
-        text = output("scan", "fm", "--demo")
+        text = output("scan", "fm", "--demo", "--no-rds")
         assert "stereo" in text
         assert "mono" in text
 
     def test_skipping_the_stereo_check_says_so_rather_than_guessing(self) -> None:
-        text = output("scan", "fm", "--demo", "--no-stereo")
+        text = output("scan", "fm", "--demo", "--no-stereo", "--no-rds")
         assert "unchecked" in text
         assert "mono" not in text
 
@@ -127,7 +127,7 @@ class TestScanFm:
         assert "--demo" in text
 
     def test_json_output_is_machine_readable(self) -> None:
-        result = runner.invoke(app, ["scan", "fm", "--demo", "--json"])
+        result = runner.invoke(app, ["scan", "fm", "--demo", "--json", "--no-rds"])
         assert result.exit_code == 0
         payload = json.loads(result.output)
         assert payload["band"] == "FM broadcast"
@@ -138,15 +138,15 @@ class TestScanFm:
 
     def test_a_higher_threshold_finds_fewer_stations(self) -> None:
         lenient = json.loads(
-            runner.invoke(app, ["scan", "fm", "--demo", "--json", "-t", "10"]).output
+            runner.invoke(app, ["scan", "fm", "--demo", "--json", "--no-rds", "-t", "10"]).output
         )
         strict = json.loads(
-            runner.invoke(app, ["scan", "fm", "--demo", "--json", "-t", "45"]).output
+            runner.invoke(app, ["scan", "fm", "--demo", "--json", "--no-rds", "-t", "45"]).output
         )
         assert len(strict["stations"]) < len(lenient["stations"])
 
     def test_an_unknown_band_lists_the_valid_ones(self) -> None:
-        result = runner.invoke(app, ["scan", "fm", "--demo", "--band", "shortwave"])
+        result = runner.invoke(app, ["scan", "fm", "--demo", "--no-rds", "--band", "shortwave"])
         assert result.exit_code == 2
         text = " ".join(result.output.split())
         assert "Unknown band" in text
@@ -154,15 +154,23 @@ class TestScanFm:
 
     def test_the_japanese_band_plan_is_available(self) -> None:
         payload = json.loads(
-            runner.invoke(app, ["scan", "fm", "--demo", "--json", "--band", "fm-japan"]).output
+            runner.invoke(
+                app, ["scan", "fm", "--demo", "--json", "--no-rds", "--band", "fm-japan"]
+            ).output
         )
         assert payload["band"] == "FM broadcast (Japan)"
 
-    def test_names_are_promised_for_the_version_that_brings_rds(self) -> None:
-        # The name column is left out until there is something to put in it, so an
-        # always-empty column does not read as a bug.
+    def test_station_names_are_read_from_rds(self) -> None:
+        # The demonstration band carries RDS, so a scan of it shows names as a real one would.
         text = output("scan", "fm", "--demo")
-        assert "RDS decoding in v0.3" in text
+        assert "OPENWAVE" in text
+        assert "CITY FM" in text
+
+    def test_switching_rds_off_leaves_the_name_column_out(self) -> None:
+        # No names to show, so the column is omitted rather than left permanently blank.
+        text = output("scan", "fm", "--demo", "--no-rds")
+        assert "OPENWAVE" not in text
+        assert "No station names" in text
 
     def test_a_receiver_that_cannot_reach_the_band_fails_cleanly(self) -> None:
         result = runner.invoke(app, ["scan", "fm", "--device", "hackrf"])
