@@ -62,9 +62,9 @@ OpenWave is in early development. Nothing is released yet.
 | Area | Status |
 |---|---|
 | Repository, CI, contribution guide | 🟢 in place |
-| Hardware abstraction layer (`sdr/`) | 🟡 in progress |
-| Simulated devices (synthetic IQ, MPEG-TS replay) | 🟡 in progress |
-| FM band scan (v0.1) | 🔴 not started |
+| Hardware abstraction layer (`sdr/`) | 🟢 in place |
+| Simulated devices (synthetic IQ, MPEG-TS replay) | 🟢 in place |
+| FM band scan (v0.1) | 🟡 in progress |
 | FM demodulation and playback (v0.2) | 🔴 not started |
 | RDS decoding (v0.3) | 🔴 not started |
 | DVB-T scan (v0.4) | 🔴 not started |

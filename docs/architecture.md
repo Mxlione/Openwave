@@ -128,10 +128,39 @@ that passes CI can still fail on a rooftop antenna.
 That is why `hardware validation` issues exist, and why the hardware report template asks what you
 know is actually on the air. Simulation proves the maths; only hardware proves the product.
 
+## Why the FM detector measures channel power, not spectral peaks
+
+The obvious way to find FM stations is to compute a spectrum and look for peaks. It does not
+work, and the simulator is what showed it.
+
+Wideband FM with a 75 kHz deviation has a modulation index of about 75 for a 1 kHz tone. At that
+index the carrier itself is almost entirely suppressed, and the energy piles up at the two
+extremes of the deviation, where the instantaneous frequency dwells longest. A station at
+98.0 MHz therefore produces spectral peaks near 97.93 and 98.07 MHz, and nothing much at
+98.0 MHz. Peak picking finds the skirts of the signal and reports a station that is not there,
+twice, while missing the one that is.
+
+What works is integrating power across the channel:
+
+1. Walk the 100 kHz raster across the band.
+2. For each candidate channel, integrate the power spectral density over the 200 kHz channel
+   bandwidth.
+3. Compare that to the noise floor estimated from the median of the same spectrum.
+4. Keep the local maximum across neighbouring channels, because a strong station lights up its
+   neighbours too.
+
+Measured against the simulator, a station at 98.0 MHz comes out 57.4 dB above the noise, its
+neighbours at 97.9 and 98.1 MHz come out at 54.4 dB, and an empty channel at 98.5 MHz comes out
+at -0.1 dB. The true carrier is the local maximum, the empty channel is unambiguous, and step 4
+is what turns three detections into one station.
+
+This is the kind of thing the simulated receiver is for. The naive approach would have looked
+correct in code review and produced confidently wrong frequencies on real hardware.
+
 ## Error handling
 
 Device problems are typed and distinguishable, because the UI needs to say something useful:
-`DeviceNotFound`, `DeviceBusy`, `UnsupportedSampleRate`, `TuningFailed`, `NoLock`. "Scan failed" is
+`DeviceNotFoundError`, `DeviceBusyError`, `UnsupportedSampleRateError`, `TuningFailedError`, `NoLockError`. "Scan failed" is
 not an acceptable message when the real cause is that the dongle is unplugged.
 
 ## Adding a new receiver

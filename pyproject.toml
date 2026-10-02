@@ -68,6 +68,7 @@ select = [
     "N",        # pep8-naming
     "UP",       # pyupgrade
     "B",        # bugbear
+    "BLE",      # blind-except: catching bare Exception needs a stated reason
     "C4",       # comprehensions
     "SIM",      # simplify
     "RUF",      # ruff-specific
@@ -95,8 +96,10 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+# src is included so the doctests in docstrings are run too: an example that no longer works is
+# worse than no example, because somebody will copy it.
+testpaths = ["tests", "src"]
+addopts = "-ra --strict-markers --doctest-modules"
 markers = [
     "hardware: requires a physical SDR or DVB-T receiver (skipped in CI)",
     "slow: takes more than a few seconds",

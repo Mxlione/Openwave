@@ -29,21 +29,30 @@ these.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 9 | ⬜ | `SdrDevice` interface | ABC: `open`, `close`, `set_center_freq`, `set_sample_rate`, `read_samples` |
-| 10 | ⬜ | `device_manager` | Enumeration, selection, typed errors (`DeviceNotFound`, `DeviceBusy`) |
-| 11 | ⬜ | **`MockSdrDevice`** | Synthetic IQ: FM carriers at chosen frequencies, controllable noise floor and SNR |
-| 12 | ⬜ 📡 | `RtlSdrDevice` | Real implementation via `pyrtlsdr`, written blind — needs validation |
-| 13 | ⬜ 🟢 | IQ file I/O | Read and write `.cf32` so community captures can be replayed |
-| 14 | ⬜ | `DvbDevice` interface | `tune`, `has_lock`, `read_ts`, quality metrics (SNR, BER) |
-| 15 | ⬜ | **`MockDvbDevice`** | Replays sample MPEG-TS files, simulates lock and metrics |
+| 9 | ✅ | `SdrDevice` interface | ABC: `open`, `close`, `set_center_freq`, `set_sample_rate`, `read_samples` |
+| 10 | ✅ | `device_manager` | Enumeration, selection, typed errors (`DeviceNotFoundError`, `DeviceBusyError`) |
+| 11 | ✅ | **`MockSdrDevice`** | Synthetic IQ: FM carriers at chosen frequencies, controllable noise floor and SNR |
+| 12 | ✅ 📡 | `RtlSdrDevice` | Real implementation via `pyrtlsdr`, written blind — needs validation |
+| 13 | ✅ | IQ file I/O | Read and write `.cf32`, `.cu8` and `.cs16` with a metadata sidecar, so community captures can be replayed through the receiver interface |
+| 14 | ✅ | `DvbDevice` interface | `tune`, `has_lock`, `read_ts`, quality metrics (SNR, BER) |
+| 15 | ✅ | **`MockDvbDevice`** | Replays sample MPEG-TS files, simulates lock and metrics |
+
+**What Phase 1 delivered.** `SdrDevice` and `DvbDevice` with the state and validation in the
+base class, so a driver implements only the parts that touch hardware. `MockSdrDevice`, whose
+output is fully determined by a seed and a position on its timeline — one read of 4096 samples
+is bit-for-bit identical to two reads of 2048, noise included, so any failure reproduces from a
+seed and an offset. `MockDvbDevice` replaying transport streams. Capture files in `.cf32`,
+`.cu8` and `.cs16` with a metadata sidecar, replayable through the same interface as hardware.
+A driver registry behind one `open_device("rtlsdr:1")` call. And `openwave devices` and
+`openwave probe` to see it all from a terminal.
 
 ## Phase 2 — v0.1 · FM scan
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 16 | ⬜ | `signal_detector` | Welch PSD, noise-floor estimation, peak detection above a dB threshold |
+| 16 | ⬜ | `signal_detector` | Welch PSD, noise-floor estimation, **channel power** integration over the channel bandwidth. Not peak picking: wideband FM suppresses its own carrier, so peaks land on the deviation edges ([why](docs/architecture.md)) |
 | 17 | ⬜ 🟢 | `frequency_manager` | FM plan 87.5–108 MHz, 100 kHz raster, segmentation by device bandwidth |
-| 18 | ⬜ | `scanner` | Sweep orchestration, peak aggregation, edge-duplicate merging |
+| 18 | ⬜ | `scanner` | Sweep orchestration, local-maximum selection across adjacent channels, edge-duplicate merging |
 | 19 | ⬜ 🟢 | `Station` model | `freq_hz`, `power_dbm`, `snr_db`, `bandwidth_hz`, `stereo`, `name` |
 | 20 | ⬜ | Stereo detection | Via the 19 kHz pilot tone |
 | 21 | ⬜ | Tests | Station injected at 98.0 MHz detected within ±50 kHz, with and without noise |

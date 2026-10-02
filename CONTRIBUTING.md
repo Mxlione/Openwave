@@ -13,7 +13,17 @@ If you own a receiver, look for issues labelled **`hardware validation`**. Runni
 real hardware and reporting what happened — even "it crashed with this traceback" — unblocks work
 nobody else can do.
 
-A **hardware report** issue template is provided for exactly this.
+Two commands are all it takes to produce a useful report:
+
+```bash
+pip install -e ".[dev,rtlsdr]"
+
+openwave devices              # does OpenWave see your dongle at all?
+openwave probe -d rtlsdr      # can it tune, and do samples come out?
+```
+
+Then open an issue with the **📡 Hardware report** template and paste the output, whatever it
+says. A traceback is a result. So is "it worked".
 
 ## Ways to contribute
 
