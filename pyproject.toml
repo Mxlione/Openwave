@@ -105,6 +105,10 @@ markers = [
     "media: requires libVLC and the python-vlc bindings",
     "slow: takes more than a few seconds",
 ]
+filterwarnings = [
+    # Starlette's own notice about httpx, which OpenWave does not choose and cannot act on.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
 
 [tool.coverage.run]
 source = ["src/openwave"]

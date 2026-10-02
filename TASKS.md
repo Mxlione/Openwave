@@ -187,11 +187,33 @@ check: it lays out kernel structures byte by byte, and a field in the wrong plac
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 43 | ⬜ | FastAPI + Pydantic | `/scan`, `/stations`, `/channels`, `/streams`, generated OpenAPI |
-| 44 | ⬜ | `streams` endpoint | HTTP stream consumable by libVLC or an external player |
-| 45 | ⬜ | WebSocket | Scan progress and live spectrum |
-| 46 | ⬜ | Versioning | `/api/v1` prefix, documented contract |
-| 47 | ⬜ | API tests | Entirely on simulated devices, CI-runnable |
+| 43 | ✅ | FastAPI + Pydantic | `/scan`, `/stations`, `/channels`, `/streams`, generated OpenAPI |
+| 44 | ✅ | `streams` endpoint | HTTP stream consumable by libVLC or an external player |
+| 45 | ✅ | WebSocket | Scan progress. The live spectrum arrives with v0.7 (task 55) |
+| 46 | ✅ | Versioning | `/api/v1` prefix, documented contract |
+| 47 | ✅ | API tests | Entirely on simulated devices, CI-runnable |
+
+**What Phase 6 delivered.** `openwave serve` runs an HTTP API under `/api/v1`, with the schema
+generated from the same Pydantic models the rest of the code uses — which is what the Angular
+client will be generated from, and what stops the two drifting apart.
+
+Decisions worth recording:
+
+- **A scan is a job, not a request.** An FM sweep takes seconds and a television sweep up to a
+  minute. A request that blocks for a minute times out in proxies, cannot report progress, and
+  leaves a client with nothing to show. So `POST /scans` returns an identifier at once, and the
+  result is collected afterwards or watched over a WebSocket.
+- **One scan at a time, and the second is refused rather than queued.** A receiver cannot be
+  tuned to two places at once, and queuing would leave somebody waiting on a scan they did not
+  ask for.
+- **The device listing says which drivers have never touched hardware.** A client should be able
+  to say so rather than implying a reading is trustworthy.
+- **The audio stream can be bounded.** `?seconds=2` gives a finite clip whose header states its
+  length, which is both a real feature and the only way the endpoint is testable: an endless
+  HTTP response cannot be completed, so a test client waits for ever.
+- **The scanning runs in a worker thread**, because it is ordinary blocking NumPy code. NumPy
+  releases the interpreter lock for the work that matters, and rewriting the signal processing to
+  yield would make it harder to read for no benefit.
 
 ## Phase 7 — v0.6 · Angular interface
 

@@ -62,7 +62,11 @@ demodulator work without owning a receiver:
 ```bash
 openwave scan fm --demo      # scan an invented band
 openwave listen 88.1 --demo  # and listen to one of its stations
+openwave scan tv --demo      # scan invented television multiplexes
+openwave serve --demo        # and serve all of it over HTTP
 ```
+
+With the server running, the interactive documentation is at http://127.0.0.1:8000/docs.
 
 `pip install -e ".[dev]"` alone is enough to run the whole test suite, because the tests use the
 simulated receivers.

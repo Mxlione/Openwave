@@ -68,7 +68,7 @@ OpenWave est en développement initial. Rien n'est encore publié.
 | Démodulation FM et écoute (v0.2) | 🟢 en place |
 | Décodage RDS (v0.3) | 🟢 en place |
 | Scan DVB-T (v0.4) | 🟢 en place |
-| API HTTP (v0.5) | 🔴 à faire |
+| API HTTP (v0.5) | 🟢 en place |
 | Interface Angular (v0.6) | 🔴 à faire |
 | Spectre temps réel (v0.7) | 🔴 à faire |
 
@@ -183,10 +183,10 @@ OpenWave/
 │   │   └── wav.py
 │   │
 │   ├── api/               # API HTTP + WebSocket
-│   │   ├── scan.py
-│   │   ├── stations.py
-│   │   ├── channels.py
-│   │   └── streams.py
+│   │   ├── app.py         # Routes, servies sous /api/v1
+│   │   ├── models.py      # Formes des requêtes et des réponses
+│   │   ├── scans.py       # Les scans comme tâches de fond
+│   │   └── streams.py     # Audio sur HTTP
 │   │
 │   └── cli.py             # Ligne de commande `openwave`
 │

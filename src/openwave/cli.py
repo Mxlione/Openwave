@@ -665,5 +665,75 @@ def _record(listener: FmListener, path: Path, *, seconds: float) -> None:
     )
 
 
+@app.command()
+def serve(
+    host: Annotated[
+        str,
+        typer.Option(
+            "--host",
+            help=(
+                "Address to listen on. The default is loopback only: OpenWave has no "
+                "authentication, so exposing it on a network makes your receiver available to "
+                "whoever can reach it."
+            ),
+        ),
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", "-p", help="Port to listen on.")] = 8000,
+    device: DeviceOption = "mock",
+    tuner: Annotated[
+        str, typer.Option("--tuner", "-u", help="DVB tuner the API should use.")
+    ] = "mockdvb",
+    demo: Annotated[
+        bool,
+        typer.Option(
+            "--demo",
+            help="Serve the invented band and multiplexes, to try the API without hardware.",
+        ),
+    ] = False,
+    reload: Annotated[
+        bool, typer.Option("--reload", help="Restart when the source changes, for development.")
+    ] = False,
+) -> None:
+    """Run the HTTP API.
+
+    The interactive documentation is at /docs and the schema at /openapi.json. The Angular
+    client is generated from that schema, which is what keeps the two in step.
+    """
+    try:
+        import uvicorn
+    except ImportError as error:
+        errors.print(
+            "[red]The API needs the optional extra.[/red] Install it with: "
+            + escape('pip install "openwave[api]"')
+        )
+        raise typer.Exit(1) from error
+
+    from openwave.api.app import API_PREFIX, create_app
+
+    if demo:
+        from openwave.radio.demo import demo_receiver
+        from openwave.tv.demo import demo_tuner
+
+        application = create_app(
+            device_factory=lambda _spec: demo_receiver(),
+            tuner_factory=lambda _spec: demo_tuner(),
+        )
+    else:
+        application = create_app(device_spec=device, tuner_spec=tuner)
+
+    console.print(f"OpenWave API on [bold]http://{host}:{port}{API_PREFIX}[/bold]")
+    console.print(f"[dim]Documentation at http://{host}:{port}/docs[/dim]")
+    if demo:
+        console.print("[dim]Serving an invented band and invented multiplexes.[/dim]")
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        console.print(
+            f"[yellow]Listening on {host}, not just this machine.[/yellow] OpenWave has no "
+            "authentication, so anybody who can reach this port can tune your receiver and "
+            "listen through it."
+        )
+
+    uvicorn.run(application, host=host, port=port, reload=reload, log_level="info")
+
+
 if __name__ == "__main__":
     app()
