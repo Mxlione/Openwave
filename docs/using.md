@@ -12,6 +12,11 @@ openwave devices
 Lists what can be opened. The simulator is always there; a dongle appears if one is plugged in,
 its driver is installed, and [the permissions are right](installing.md#udev-rules-for-rtl-sdr).
 
+![openwave devices](images/cli-devices.svg)
+
+That is a machine with no receiver attached, which is why the RTL-SDR row says the driver is
+missing rather than pretending there is nothing to find.
+
 ```bash
 openwave probe -d rtlsdr
 ```
@@ -80,6 +85,10 @@ openwave scan tv --lock-timeout 1.0     # quicker, may miss a marginal multiplex
 | `--no-scrambled` | Leave out services that cannot be watched |
 | `--json` | Machine-readable output |
 
+Against the simulator, with `--demo`:
+
+![openwave scan tv --demo](images/cli-scan-tv.svg)
+
 ## The interface
 
 ```bash
@@ -93,6 +102,24 @@ Serves the API and the interface at <http://127.0.0.1:8000>, with the documentat
     OpenWave has no authentication. `--host 0.0.0.0` makes your receiver available to anybody
     who can reach the port: they can tune it, listen through it, and see what is on the air
     where you are. Put it behind something that asks who is calling before exposing it.
+
+Three pages. **Stations** lists what an FM scan found, with a star to remember one and a button
+to listen:
+
+![The station list](images/ui-stations.png)
+
+**Channels** groups television services by the multiplex carrying them, and shows the number a
+viewer would type. A scrambled service is listed and marked, never decrypted:
+
+![Television channels](images/ui-channels.png)
+
+**Spectrum** opens a WebSocket and draws what the receiver hears, with a waterfall underneath
+holding the last few seconds. Point at it to read a frequency off it:
+
+![The live spectrum](images/ui-spectrum.png)
+
+These are screenshots of the real interface against the simulator, taken by
+`scripts/capture_interface.py`, which runs a scan and drives a browser to produce them.
 
 ## Replaying a recorded capture
 

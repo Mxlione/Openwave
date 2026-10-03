@@ -2,6 +2,8 @@
 
 Every command takes `--help`.
 
+![openwave --help](images/cli-help.svg)
+
 ## `openwave devices`
 
 Lists the receivers and tuners that can be opened. The simulator is always listed. If a dongle

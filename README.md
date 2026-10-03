@@ -16,6 +16,22 @@ interface**, ready to listen to or watch.
 
 ---
 
+## 📸 What it looks like
+
+A scan of the simulated band, with no receiver attached. Every picture here comes from running
+the real program — `scripts/capture_cli.py` and `scripts/capture_interface.py` regenerate them.
+
+![openwave scan fm --demo](docs/images/cli-scan-fm.svg)
+
+| | |
+|---|---|
+| ![The station list](docs/images/ui-stations.png) | ![The live spectrum](docs/images/ui-spectrum.png) |
+| The stations a scan found, with signal, mode and RDS name | The spectrum and waterfall, live over a WebSocket |
+
+![Television channels](docs/images/ui-channels.png)
+
+---
+
 ## 🎯 Goals
 
 - Scan the FM band automatically and detect the stations present

@@ -342,7 +342,7 @@ silently tunes somewhere else.
 | 63 | ⬜ | `good first issue` set | 8–10 issues with affected files and acceptance criteria |
 | 64 | ⬜ | `hardware validation` issues | One per unvalidated driver (RTL-SDR, DVB-T) |
 | 65 | ⬜ | Labels and milestones | `v0.1` through `v1.0` |
-| 66 | ⬜ | Showcase | Real CI badges, CLI GIF, UI screenshots |
+| 66 | 🟢 | Showcase | Real CI badges, generated CLI and interface pictures |
 | 67 | ⬜ | GitHub topics | `sdr`, `rtl-sdr`, `fm-radio`, `dvb-t`, `signal-processing`, `python`, `angular` |
 | 68 | ⬜ | Public announcement | r/RTLSDR, r/opensource, Show HN |
 

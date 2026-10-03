@@ -16,6 +16,22 @@ l'utilisateur** dans une interface claire, prêts à être écoutés ou regardé
 
 ---
 
+## 📸 À quoi ça ressemble
+
+Un scan de la bande simulée, sans aucun récepteur branché. Chaque image vient d'une exécution
+réelle du programme : `scripts/capture_cli.py` et `scripts/capture_interface.py` les regénèrent.
+
+![openwave scan fm --demo](docs/images/cli-scan-fm.svg)
+
+| | |
+|---|---|
+| ![La liste des stations](docs/images/ui-stations.png) | ![Le spectre en direct](docs/images/ui-spectrum.png) |
+| Les stations trouvées par un scan, avec signal, mode et nom RDS | Le spectre et la cascade, en direct via WebSocket |
+
+![Chaînes de télévision](docs/images/ui-channels.png)
+
+---
+
 ## 🎯 Objectifs
 
 - Scanner automatiquement la bande FM et détecter les stations présentes

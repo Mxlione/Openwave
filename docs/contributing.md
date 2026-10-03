@@ -61,6 +61,23 @@ OpenWave receives public, freely accessible broadcasts. Contributions that circu
 encryption, conditional access or paid services will be declined regardless of their quality.
 See [Scope of use](legal.md).
 
+## The screenshots
+
+The pictures in the README and on these pages are generated, not taken by hand:
+
+```bash
+python scripts/capture_cli.py        # the terminal output, as SVG
+python scripts/capture_interface.py  # the interface, needs Chrome and a built frontend
+```
+
+Both run the real program against the simulator. The command line one records what Rich printed
+and exports it, so the image is the same characters a terminal would show, and `docs/index.md`
+had a table pasted in by hand that had already drifted from what the program prints.
+
+They are not run in CI. A screenshot differs in a few bytes between browser versions, so a
+diff check would fail for reasons nobody can act on. Run them when you change the interface or
+the output of a command, and commit what comes out.
+
 ## Releasing
 
 Only a maintainer can do this, but it is written down so that it is not a secret.
