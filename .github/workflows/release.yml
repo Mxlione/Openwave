@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Tag or commit to build"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # A tag that disagrees with the version in the code produces a wheel whose filename lies
+      # about its contents. Catch it here, before anything is published.
+      - name: Check the tag matches the version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          code_version=$(python -c 'import re,pathlib; print(re.search(r"__version__ = \"(.+)\"", pathlib.Path("src/openwave/__init__.py").read_text()).group(1))')
+          tag_version="${GITHUB_REF_NAME#v}"
+          echo "code: $code_version"
+          echo "tag:  $tag_version"
+          if [ "$code_version" != "$tag_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match __version__ = $code_version"
+            exit 1
+          fi
+
+      # The released wheel serves the interface without Node installed, which means the build
+      # output has to be inside the package before hatchling runs.
+      - name: Build the interface
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Move the interface into the package
+        run: |
+          rm -rf src/openwave/interface
+          cp -r frontend/dist/frontend/browser src/openwave/interface
+          test -f src/openwave/interface/index.html
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+
+      - name: Check metadata
+        run: |
+          pip install twine
+          twine check dist/*
+
+      # A wheel that does not carry the interface would start and serve a 404 where the interface
+      # should be. Prove the file is in the archive rather than trusting the copy above.
+      - name: Check the wheel carries the interface
+        run: |
+          python - <<'PY'
+          import pathlib, zipfile
+          wheel = next(pathlib.Path("dist").glob("*.whl"))
+          names = zipfile.ZipFile(wheel).namelist()
+          assert "openwave/interface/index.html" in names, "the interface is missing from the wheel"
+          print(f"{wheel.name} carries {sum(n.startswith('openwave/interface/') for n in names)} interface files")
+          PY
+
+      # Install the wheel in a clean environment and run it, so a release cannot ship a package
+      # that imports but does not work.
+      - name: Smoke test the wheel
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install "$(ls dist/*.whl)[api]"
+          /tmp/smoke/bin/openwave version
+          /tmp/smoke/bin/openwave scan fm --demo --json > /tmp/scan.json
+          python - <<'PY'
+          import json
+          result = json.load(open("/tmp/scan.json"))
+          assert result["stations"], "the demo scan found no stations"
+          named = [s for s in result["stations"] if s.get("name")]
+          assert named, "the demo scan read no RDS station name"
+          print(f'{len(result["stations"])} stations, {len(named)} named')
+          PY
+          /tmp/smoke/bin/openwave serve --demo --port 8731 &
+          server=$!
+          trap 'kill $server 2>/dev/null || true' EXIT
+          for _ in $(seq 60); do
+            curl -sf http://127.0.0.1:8731/api/v1/health >/dev/null && break
+            sleep 0.5
+          done
+          curl -sf http://127.0.0.1:8731/api/v1/health
+          curl -sf http://127.0.0.1:8731/ | grep -qi '<!doctype html' \
+            || { echo "::error::the installed wheel does not serve the interface"; exit 1; }
+          echo "the installed wheel serves the API and the interface"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  github-release:
+    name: Attach to the GitHub release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+
+  pypi:
+    name: Publish to PyPI
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    # This environment does not exist until somebody creates it in the repository's settings,
+    # which means this job cannot publish anything by accident. Add a required reviewer there
+    # and a release waits for a human.
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      # Trusted publishing: no API token in the repository's secrets. It needs a pending
+      # publisher configured on PyPI for this repository and this workflow filename.
+      - uses: pypa/gh-action-pypi-publish@release/v1

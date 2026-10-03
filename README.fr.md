@@ -228,7 +228,7 @@ OpenWave/
 - [ ] **v0.5** — API stable (`scan`, `stations`, `channels`, `streams`)
 - [ ] **v0.6** — interface Angular (liste, favoris, signal)
 - [ ] **v0.7** — visualisation du spectre en temps réel
-- [ ] **v1.0** — documentation complète, packaging pour Linux
+- [x] **v1.0** — documentation complète, packaging pour Linux
 
 Le découpage détaillé en tâches se trouve dans [TASKS.md](TASKS.md).
 
@@ -251,10 +251,34 @@ locale sur la réception radioélectrique avant utilisation. Voir [docs/legal.md
 
 ---
 
+## 📚 Documentation
+
+La documentation est en anglais, comme le reste du dépôt.
+
+| | |
+|---|---|
+| [Installing](docs/installing.md) | Ce qu'il faut installer, et ce que chaque extra apporte |
+| [Using OpenWave](docs/using.md) | Du premier scan à l'écoute d'une station |
+| [Command line](docs/cli.md) | Toutes les commandes et options |
+| [HTTP API](docs/api.md) | Routes, WebSockets, et le schéma généré |
+| [Hardware](docs/hardware.md) | Brancher un récepteur, droits d'accès, dépannage |
+| [Compatibility](docs/compatibility.md) | Les récepteurs dont on sait qu'ils marchent |
+| [Architecture](docs/architecture.md) | Comment les morceaux s'assemblent, et pourquoi |
+| [Signals](docs/signals.md) | La radio et le traitement du signal derrière le code |
+| [Contributing](docs/contributing.md) | Installation, vérifications, règles |
+
+`mkdocs serve` la sert comme un site.
+
+---
+
 ## 🤝 Contribuer
 
 Le projet démarre et toutes les contributions sont bienvenues : code, tests avec du matériel réel,
 documentation, traductions, idées.
+
+**La contribution la plus utile est de faire tourner OpenWave sur un vrai récepteur et de dire ce
+qui s'est passé**, même si ça a planté. Personne ne l'a fait. Voir
+[la matrice de compatibilité](docs/compatibility.md) pour ce qui est connu et ce qui ne l'est pas.
 
 Lis [CONTRIBUTING.md](CONTRIBUTING.md) pour installer l'environnement, puis cherche l'étiquette
 [`good first issue`](https://github.com/Mxlione/Openwave/labels/good%20first%20issue).

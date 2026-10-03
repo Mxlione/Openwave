@@ -1,0 +1,20 @@
+OpenWave for Debian
+===================
+
+Two things to do after installing.
+
+Join the plugdev group, so an RTL-SDR dongle can be opened without root:
+
+    sudo usermod -aG plugdev "$USER"
+
+Then log out and in again. The udev rules this package installed take effect the next time the
+dongle is plugged in.
+
+For a DVB-T tuner, join the video group instead:
+
+    sudo usermod -aG video "$USER"
+
+The hardware drivers in this release have never been run against real hardware. If you have a
+receiver, please report what happens:
+
+    https://github.com/Mxlione/Openwave/issues

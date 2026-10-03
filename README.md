@@ -227,7 +227,7 @@ OpenWave/
 - [ ] **v0.5** — Stable API (`scan`, `stations`, `channels`, `streams`)
 - [ ] **v0.6** — Angular interface (lists, favourites, signal)
 - [ ] **v0.7** — Real-time spectrum display
-- [ ] **v1.0** — Full documentation, Linux packaging
+- [x] **v1.0** — Full documentation, Linux packaging
 
 The task breakdown behind this roadmap lives in [TASKS.md](TASKS.md).
 
@@ -250,10 +250,32 @@ using it. See [docs/legal.md](docs/legal.md).
 
 ---
 
+## 📚 Documentation
+
+| | |
+|---|---|
+| [Installing](docs/installing.md) | What to install, and what each extra pulls in |
+| [Using OpenWave](docs/using.md) | From a first scan to listening to a station |
+| [Command line](docs/cli.md) | Every command and option |
+| [HTTP API](docs/api.md) | Routes, WebSockets, and the generated schema |
+| [Hardware](docs/hardware.md) | Attaching a receiver, permissions, troubleshooting |
+| [Compatibility](docs/compatibility.md) | Which receivers are known to work |
+| [Architecture](docs/architecture.md) | How the pieces fit, and why |
+| [Signals](docs/signals.md) | The radio and DSP behind the code |
+| [Contributing](docs/contributing.md) | Getting set up, the checks, the rules |
+
+Run `mkdocs serve` to read it as a site.
+
+---
+
 ## 🤝 Contributing
 
 The project is just starting and every kind of contribution is welcome: code, testing with real
 hardware, documentation, translations, ideas.
+
+**The single most useful thing you can do is run OpenWave on a real receiver and say what
+happened**, even if it crashed. Nobody has. See
+[the compatibility matrix](docs/compatibility.md) for what is and is not known.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, then look for the
 [`good first issue`](https://github.com/Mxlione/Openwave/labels/good%20first%20issue) label.

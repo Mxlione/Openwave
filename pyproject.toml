@@ -4,7 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openwave"
-version = "0.1.0.dev0"
+# Read from src/openwave/__init__.py, so that the version a user sees from `openwave --version`
+# and the version pip installed can never disagree.
+dynamic = ["version"]
 description = "Scan, detect and play publicly broadcast FM radio and digital TV services"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -35,7 +37,10 @@ dependencies = [
 rtlsdr = ["pyrtlsdr>=0.3"]
 api = ["fastapi>=0.110", "uvicorn[standard]>=0.29", "websockets>=12.0"]
 media = ["python-vlc>=3.0"]
-docs = ["mkdocs>=1.6", "mkdocs-material>=9.5"]
+# Bounded below 2.0 deliberately: the Material theme's own notice says MkDocs 2.0 removes
+# the plugin system with no migration path, so an unbounded dependency would break the docs
+# build on an upgrade nobody asked for.
+docs = ["mkdocs>=1.6,<2", "mkdocs-material>=9.5,<10"]
 dev = [
     "pytest>=8.1",
     "pytest-cov>=5.0",
@@ -52,8 +57,41 @@ Issues = "https://github.com/Mxlione/Openwave/issues"
 [project.scripts]
 openwave = "openwave.cli:app"
 
+[tool.hatch.version]
+path = "src/openwave/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/openwave"]
+# The built interface, when there is one. The release workflow builds it and copies it to
+# src/openwave/interface before building the wheel, so a released wheel serves the interface
+# with no Node installed. A checkout has no such directory, and the API finds the build output
+# in frontend/dist instead.
+artifacts = ["src/openwave/interface/**"]
+
+[tool.hatch.build.targets.sdist]
+# The source distribution carries the interface's sources and the schema its types come from,
+# but not node_modules or a build.
+include = [
+    "/src",
+    "/tests",
+    "/docs",
+    "/scripts",
+    "/packaging",
+    "/frontend/src",
+    "/frontend/public",
+    "/frontend/openapi.json",
+    "/frontend/package.json",
+    "/frontend/package-lock.json",
+    "/frontend/angular.json",
+    "/frontend/tsconfig*.json",
+    "/frontend/README.md",
+    "/mkdocs.yml",
+    "/README.md",
+    "/README.fr.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/TASKS.md",
+]
 
 [tool.ruff]
 line-length = 100

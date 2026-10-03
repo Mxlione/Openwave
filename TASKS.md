@@ -290,10 +290,50 @@ copy of every frame or an FFT that grew by a factor of ten.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 59 | ⬜ | Docs site | MkDocs: install, usage, architecture, API, contributing |
-| 60 | ⬜ 📡 | Compatibility matrix | Tested hardware, filled in by the community |
-| 61 | ⬜ | Linux packaging | PyPI wheel plus AppImage or `.deb`, udev rules for RTL-SDR |
-| 62 | ⬜ | Release process | `CHANGELOG.md`, publish workflow, version tags |
+| 59 | 🟢 | Docs site | MkDocs: install, usage, architecture, API, contributing |
+| 60 | 🟢 📡 | Compatibility matrix | Tested hardware, filled in by the community |
+| 61 | 🟢 | Linux packaging | PyPI wheel plus AppImage or `.deb`, udev rules for RTL-SDR |
+| 62 | 🟢 | Release process | `CHANGELOG.md`, publish workflow, version tags |
+
+### What Phase 9 delivered
+
+**The documentation site is ten pages and `mkdocs build --strict` passes**, which means a link
+to a page that no longer exists fails the build rather than becoming a dead link somebody finds
+later. A CI job builds it on every pull request and deploys it to Pages from `main`.
+
+**The docs dependency is bounded to `mkdocs>=1.6,<2`.** Not caution for its own sake: the
+Material theme's own notice says MkDocs 2.0 removes the plugin system with no migration path, so
+an unbounded range would break the site the day 2.0 ships.
+
+**The version now lives in one place.** It was declared twice, in `pyproject.toml` and in
+`src/openwave/__init__.py`. Nothing enforced that they agreed, so the first release to touch one
+and forget the other would have shipped a wheel whose filename disagreed with what
+`openwave version` printed. Hatchling now reads it from the module, and the release workflow
+refuses to build if the git tag disagrees with it.
+
+**A published wheel has to carry the interface**, because somebody installing from PyPI has no
+Node. The release workflow builds the Angular app and copies it into `src/openwave/interface`
+before hatchling runs, and `src/openwave/api/app.py` looks in two places: that directory in an
+installed package, or `frontend/dist` in a checkout. The directory is in `.gitignore` — it is
+build output, and committing it would have been the same class of mistake as commit `0373fd1`,
+which claimed to add the interface and carried no code.
+
+**The release smoke test runs the wheel rather than importing it.** It installs into a clean
+virtual environment, runs `openwave scan fm --demo --json` and asserts that stations were found
+*and named* (a named station means the whole chain down to RDS ran), then starts the server and
+fetches both `/api/v1/health` and `/`. Writing it caught three of my own errors: `--version` and
+`scan --demo` are not the commands (`version` and `scan fm --demo` are), and `TestClient` needs
+a test-only dependency that a released wheel does not install. Each would have failed the first
+real release.
+
+**Publishing to PyPI is behind a GitHub environment that does not exist yet**, so pushing a tag
+cannot publish by accident. Creating it, with a required reviewer, is a deliberate act.
+
+**The compatibility matrix is honest about being empty.** Every receiver row says *not tested*,
+because no receiver has ever been attached. The table's job is to make that a visible gap
+somebody can close, with the DVB driver flagged as the riskiest code in the project — it lays
+out kernel structures byte by byte, and a field in the wrong place does not raise an error, it
+silently tunes somewhere else.
 
 ## Phase 10 — Community launch
 

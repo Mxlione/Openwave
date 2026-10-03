@@ -38,6 +38,11 @@ frontend/node_modules/
 frontend/dist/
 frontend/.angular/
 
+# The built interface, copied here by the release workflow so a wheel carries it. It is build
+# output, never a source: a checkout has no such directory and the API falls back to
+# frontend/dist.
+src/openwave/interface/
+
 # Docs build
 site/
 

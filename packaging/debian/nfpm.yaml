@@ -1,0 +1,49 @@
+# A Debian package built from the wheel, using nfpm (https://nfpm.goreleaser.com).
+#
+# nfpm rather than the Debian toolchain because this is a convenience for people who prefer apt
+# to pip, not an attempt at a package Debian would accept. A proper Debian package is reviewed by
+# Debian, follows its Python policy, and is maintained by somebody who runs Debian. This is not
+# that, and says so.
+#
+# NOT TESTED. There is no Debian machine here to install it on, for the same reason the hardware
+# drivers are untested. A report from somebody who has one is welcome.
+
+name: openwave
+arch: amd64
+platform: linux
+version: ${OPENWAVE_VERSION}
+section: comm
+priority: optional
+maintainer: Mxlione <https://github.com/Mxlione>
+description: |
+  Scan, detect and play publicly broadcast radio and TV services.
+  OpenWave scans the FM band and the digital television multiplexes, finds what is
+  transmitting, reads the names stations give themselves, and plays them.
+vendor: OpenWave
+homepage: https://github.com/Mxlione/Openwave
+license: MIT
+
+depends:
+  - python3 (>= 3.11)
+  - python3-numpy
+  - python3-scipy
+
+recommends:
+  # The optional extras, as the packages Debian calls them. Recommended rather than required:
+  # somebody who only wants to replay a recorded capture needs neither.
+  - librtlsdr0
+  - libvlc-dev
+  - python3-vlc
+
+suggests:
+  - rtl-sdr
+
+contents:
+  - src: packaging/udev/99-openwave-rtlsdr.rules
+    dst: /usr/lib/udev/rules.d/99-openwave-rtlsdr.rules
+
+  - src: packaging/debian/README.Debian
+    dst: /usr/share/doc/openwave/README.Debian
+
+scripts:
+  postinstall: packaging/debian/postinstall.sh

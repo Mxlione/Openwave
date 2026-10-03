@@ -151,14 +151,31 @@ def create_app(
     return app
 
 
-#: Where the built Angular interface is looked for.
+#: Places the built Angular interface might be, in the order they are tried.
 #:
-#: Relative to the installed package, so that a wheel carrying the built files serves them and
-#: a checkout that has not run ``npm run build`` simply does not. Angular 20 puts its output in
-#: a ``browser`` subdirectory.
-INTERFACE_ROOT: Final = (
-    Path(__file__).resolve().parents[3] / "frontend" / "dist" / "frontend" / "browser"
+#: Two, because the interface lives in two different places depending on how OpenWave was
+#: installed. A released wheel carries it inside the package, put there by the release
+#: workflow. A checkout has it where ``npm run build`` leaves it, which for Angular 20 is a
+#: ``browser`` subdirectory.
+#:
+#: Neither being present is a normal state rather than an error: a backend contributor should
+#: not have to install Node to run the API.
+_INTERFACE_CANDIDATES: Final = (
+    Path(__file__).resolve().parent.parent / "interface",
+    Path(__file__).resolve().parents[3] / "frontend" / "dist" / "frontend" / "browser",
 )
+
+
+def _find_interface() -> Path:
+    """Where the built interface is, or the first candidate if it is built nowhere."""
+    for candidate in _INTERFACE_CANDIDATES:
+        if (candidate / "index.html").is_file():
+            return candidate
+    return _INTERFACE_CANDIDATES[0]
+
+
+#: Where the built interface was found.
+INTERFACE_ROOT: Final = _find_interface()
 
 
 class _SinglePageFiles(StaticFiles):

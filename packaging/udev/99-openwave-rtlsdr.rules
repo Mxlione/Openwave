@@ -1,0 +1,38 @@
+# udev rules for RTL-SDR receivers, for OpenWave.
+#
+# A USB device belongs to root by default, so opening a dongle without these rules fails with a
+# permission error. Running OpenWave as root instead is a bad trade: it opens network ports, and
+# nothing it does needs privilege.
+#
+# Install:
+#     sudo cp 99-openwave-rtlsdr.rules /etc/udev/rules.d/
+#     sudo udevadm control --reload-rules && sudo udevadm trigger
+#     sudo usermod -aG plugdev "$USER"
+#
+# Then unplug the dongle and plug it in again, and log out and in again for the group to apply.
+#
+# The device is given to the plugdev group rather than made world-writable. A receiver can listen
+# to what is in the air around a machine, so every account on it having access by default is more
+# than most people would choose.
+
+# Realtek RTL2832U, the chip in essentially every RTL-SDR dongle. The product identifiers below
+# are the ones vendors ship; the tuner chip differs between them but the interface does not.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+
+# Terratec, Hama, Compro, Dexatek, Peak and others ship the same chip under their own identifiers.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0ccd", ATTRS{idProduct}=="00a9", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0ccd", ATTRS{idProduct}=="00b3", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0ccd", ATTRS{idProduct}=="00d3", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0ccd", ATTRS{idProduct}=="00e0", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1554", ATTRS{idProduct}=="5020", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="15f4", ATTRS{idProduct}=="0131", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="185b", ATTRS{idProduct}=="0620", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1b80", ATTRS{idProduct}=="d3a4", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="1f4d", ATTRS{idProduct}=="b803", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+
+# The kernel claims an RTL2832U as a DVB-T tuner, which stops it being used as a software radio.
+# Blacklisting the module is the usual remedy, but it is left to the user rather than done here:
+# somebody who bought the dongle to watch television wants exactly the opposite.
+#
+#     echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/blacklist-rtl.conf

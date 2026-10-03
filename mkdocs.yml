@@ -1,0 +1,78 @@
+site_name: OpenWave
+site_description: Scan, detect and play publicly broadcast radio and TV services.
+site_url: https://mxlione.github.io/Openwave/
+repo_url: https://github.com/Mxlione/Openwave
+repo_name: Mxlione/Openwave
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Dark first, because the project is an instrument and most of its screenshots are dark.
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: light blue
+      accent: light blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: light blue
+      accent: light blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+
+nav:
+  - Start here:
+      - index.md
+      - installing.md
+      - using.md
+  - Reference:
+      - cli.md
+      - api.md
+      - hardware.md
+      - compatibility.md
+  - How it works:
+      - architecture.md
+      - signals.md
+  - Contributing:
+      - contributing.md
+      - legal.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      check_paths: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Mxlione/Openwave
+
+# Fail the build on a broken internal link rather than publishing one.
+strict: true
+
+validation:
+  links:
+    absolute_links: ignore
+    unrecognized_links: warn
