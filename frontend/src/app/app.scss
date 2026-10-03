@@ -40,8 +40,13 @@ footer.chrome {
   gap: 1rem;
 }
 
+// Absent is not broken. --ow-poor is the colour of a bad signal, and using it here painted a
+// red message across the bottom of every page for anybody running the simulator, which is the
+// first thing a visitor does. Dimmer than the rest of the footer says "not available" without
+// claiming something has gone wrong.
 footer .absent {
-  color: var(--ow-poor);
+  color: var(--ow-text-dim);
+  opacity: 0.75;
 }
 
 .brand {

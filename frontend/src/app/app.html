@@ -39,9 +39,12 @@
     </span>
     @if (!what.rtlsdr) {
       <!-- Said plainly rather than left for somebody to discover: without this extra, the
-           RTL-SDR driver cannot be opened at all. -->
-      <span class="absent" title="Install it with: pip install &quot;openwave[rtlsdr]&quot;">
-        RTL-SDR driver not installed
+           RTL-SDR driver cannot be opened at all. The command is shown rather than hidden in a
+           title, because a title does not exist on a touch screen and is not reachable by
+           keyboard. -->
+      <span class="absent">
+        RTL-SDR driver not installed &mdash;
+        <code>pip install "openwave[rtlsdr]"</code>
       </span>
     }
   }
