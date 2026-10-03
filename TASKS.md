@@ -266,7 +266,25 @@ needs Node 22, so the project is on Angular 20, which accepts Node 20.19 and abo
 | 55 | ✅ | Continuous PSD feed | Binary WebSocket frames at 1 kB each, averaged down server-side rather than decimated — a decimated spectrum misses narrow signals, which on a display looks like a station flickering |
 | 56 | ✅ | Spectrum display | Canvas/WebGL, dB scale, station markers |
 | 57 | ✅ | Waterfall | Time cascade with a colour palette |
-| 58 | ⬜ | Performance budget | Throughput and latency measured, regression-tested |
+| 58 | ✅ | Performance budget | Throughput and latency measured, regression-tested |
+
+**What Phase 8 delivered.** The feed, the display and a budget that fails if either gets
+slower. Measured on an ordinary desktop:
+
+| | |
+|---|---|
+| Frame on the wire | 1064 bytes |
+| At 20 frames a second | 20.8 kB/s |
+| Samples averaged per frame | 65 536, which is 27 ms at 2.4 MS/s |
+| Encode / decode one frame | 11 µs / 3 µs |
+| Produce one frame | 21.7 ms |
+| Sustainable rate | 46 frames a second, against the 20 the feed asks for |
+
+The budget is a test rather than a note, because this is the one part of OpenWave where being
+slow makes it wrong: a waterfall that falls behind is showing the past, and below about ten
+frames a second it stops reading as motion. The limits are set at roughly three times the
+measured cost — wide enough not to fail on a loaded runner, narrow enough to catch an accidental
+copy of every frame or an FFT that grew by a factor of ten.
 
 ## Phase 9 — v1.0 · Documentation and packaging
 

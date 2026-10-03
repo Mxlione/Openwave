@@ -70,7 +70,7 @@ OpenWave is in early development. Nothing is released yet.
 | DVB-T scan (v0.4) | 🟢 in place |
 | HTTP API (v0.5) | 🟢 in place |
 | Angular interface (v0.6) | 🟢 in place |
-| Real-time spectrum (v0.7) | 🟡 display done, performance budget to come |
+| Real-time spectrum (v0.7) | 🟢 in place |
 
 **Honest note on hardware.** The maintainer currently has no RTL-SDR dongle and no DVB-T tuner.
 Every signal-processing stage is therefore developed and tested against **simulated devices** —
