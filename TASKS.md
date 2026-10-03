@@ -339,12 +339,40 @@ silently tunes somewhere else.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 63 | ⬜ | `good first issue` set | 8–10 issues with affected files and acceptance criteria |
-| 64 | ⬜ | `hardware validation` issues | One per unvalidated driver (RTL-SDR, DVB-T) |
-| 65 | ⬜ | Labels and milestones | `v0.1` through `v1.0` |
+| 63 | 🟢 | `good first issue` set | 10 issues with affected files and acceptance criteria |
+| 64 | 🟢 | `hardware validation` issues | One per unvalidated driver (RTL-SDR, DVB-T) |
+| 65 | 🟢 | Labels and milestones | Ten labels, and milestones for the work after v1.0 |
 | 66 | 🟢 | Showcase | Real CI badges, generated CLI and interface pictures |
-| 67 | ⬜ | GitHub topics | `sdr`, `rtl-sdr`, `fm-radio`, `dvb-t`, `signal-processing`, `python`, `angular` |
-| 68 | ⬜ | Public announcement | r/RTLSDR, r/opensource, Show HN |
+| 67 | 🟡 | GitHub topics | Listed in `.github/TOPICS.txt`; a repository setting, so set by hand |
+| 68 | 🟡 | Public announcement | Drafted in `.github/ANNOUNCEMENT.md`, to be posted by the maintainer |
+
+### What Phase 10 delivered
+
+**Ten starter issues and two hardware validation issues**, written from the code rather than
+imagined. Each names the files it touches, says what done looks like, and warns about the trap
+it contains — the SigMF one about `core:datatype` not matching OpenWave's format names, the
+noise floor one about dBFS not being dBm. Every gap they describe was checked against the source
+first: `rds_text` really does drop accents, there really is no `--deemphasis` option although
+the demodulator takes the parameter, there really is no OIRT band plan, and the interface really
+does not use `localStorage`.
+
+**A test holds them to that.** `tests/test_seed_issues.py` checks that every file an issue
+points at exists, that every label it uses is declared, and that every milestone it names is
+real. An issue that sends a newcomer to a file that was renamed wastes the time of the one
+person the project most needs to keep.
+
+**Nothing was created on GitHub from here.** `.github/workflows/bootstrap.yml` creates the
+labels, milestones and issues, and only when somebody presses the button — it defaults to a dry
+run, and it is safe to run twice because it matches on name and title and never closes or
+renames anything. Writing it caught two bugs in my own script: splitting `gh api --paginate`
+output on brackets comes apart on the nested arrays GitHub puts in an issue's labels, and
+`gh api -f` sends a milestone number as a string, so the body now goes in as JSON on standard
+input.
+
+**Topics and the announcement are deliberately not automated.** A workflow's token cannot change
+repository settings, so the topics are listed in `.github/TOPICS.txt` to be set by hand. The
+announcement is drafted for three audiences in `.github/ANNOUNCEMENT.md` and posted by nobody but
+the maintainer: it goes out under a person's name, to communities that can tell.
 
 ---
 

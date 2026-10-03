@@ -1,0 +1,17 @@
+# The milestones, which follow the roadmap in TASKS.md. `bootstrap.yml` creates them.
+#
+# Everything through v1.0 is already written. These exist so that work after it has somewhere
+# to go, and so an issue can say which release it is waiting for.
+
+- title: v1.1
+  description: >-
+    The first release shaped by people other than the maintainer: whatever real hardware and
+    real transmitters turn out to need.
+
+- title: v1.2
+  description: >-
+    Receivers beyond RTL-SDR, through SoapySDR, and the band plans and character sets that
+    countries outside the ones already covered require.
+
+- title: Backlog
+  description: Worth doing, not yet promised to a release.

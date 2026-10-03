@@ -1,0 +1,46 @@
+name: Bootstrap the repository
+
+# Creates the labels, the milestones and the starter issues, from the files in .github/.
+#
+# It only ever runs when somebody presses the button, and it never changes or closes anything
+# that already exists: a label is updated, a milestone and an issue are created only if missing,
+# matched by name and by title. Running it twice is safe and the second run does nothing.
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: "What to create"
+        required: true
+        default: "everything"
+        type: choice
+        options: [everything, labels, milestones, issues]
+      dry_run:
+        description: "List what would happen without doing it"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install PyYAML
+
+      - name: Create them
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          WHAT: ${{ inputs.what }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python .github/bootstrap.py

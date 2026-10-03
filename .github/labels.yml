@@ -1,0 +1,44 @@
+# The labels this repository uses. `.github/workflows/bootstrap.yml` creates or updates them.
+#
+# Kept short on purpose. A new contributor reads labels to decide where to start, and twenty of
+# them is a wall rather than a signpost.
+
+- name: good first issue
+  colour: "7057ff"
+  description: Self-contained, with the files and the acceptance criteria written down
+
+- name: help wanted
+  colour: "008672"
+  description: Nobody is working on this and it would be welcome
+
+- name: hardware validation
+  colour: "b60205"
+  description: Needs somebody with a real receiver; the maintainer has none
+
+- name: bug
+  colour: "d73a4a"
+  description: Something does not do what it says
+
+- name: enhancement
+  colour: "a2eeef"
+  description: A new capability or a better one
+
+- name: documentation
+  colour: "0075ca"
+  description: Docs, README, comments
+
+- name: signal processing
+  colour: "fbca04"
+  description: Touches the DSP, where being plausible is not the same as being right
+
+- name: interface
+  colour: "c2e0c6"
+  description: The Angular interface
+
+- name: driver
+  colour: "5319e7"
+  description: Talking to a receiver
+
+- name: translation
+  colour: "d4c5f9"
+  description: French, or another language

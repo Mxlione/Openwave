@@ -1,0 +1,19 @@
+The GitHub topics for this repository. A workflow's token cannot set these, because topics are a
+repository setting rather than content, so they go in by hand: the repository's front page, the
+About panel on the right, the gear icon.
+
+sdr
+rtl-sdr
+software-defined-radio
+fm-radio
+radio
+dvb-t
+rds
+signal-processing
+dsp
+python
+fastapi
+angular
+numpy
+scipy
+open-source
