@@ -1,1 +1,1 @@
-"""Stream processing and playback through FFmpeg and libVLC."""
+"""Serving a live stream, and playing it through libVLC."""

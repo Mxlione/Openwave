@@ -136,8 +136,8 @@ issues étiquetées `hardware validation`.
                    └──────────────┬──────────────┘
                                   ▼
                        ┌──────────────────────┐
-                       │   MEDIA PROCESSING   │
-                       │  FFmpeg / codecs     │
+                       │       PLAYBACK       │
+                       │  WAV framing         │
                        │  libVLC              │
                        └──────────┬───────────┘
                                   ▼
@@ -165,54 +165,64 @@ issues étiquetées `hardware validation`.
 OpenWave/
 │
 ├── src/openwave/
-│   ├── core/              # Moteur de scan
-│   │   ├── scanner.py
-│   │   ├── frequency_manager.py
-│   │   ├── signal_detector.py
-│   │   └── service_discovery.py
+│   ├── core/              # Scanning engine, independent of any band
+│   │   ├── frequency_manager.py  # Band plans, and splitting one into tuner-sized segments
+│   │   ├── scanner.py            # Sweeping a band and collecting the measurements
+│   │   ├── signal_detector.py    # Power spectrum, channel power, occupancy
+│   │   └── units.py              # dBFS, frequency formatting
 │   │
-│   ├── radio/             # Radio FM
-│   │   ├── fm_demodulator.py
-│   │   ├── listener.py
-│   │   ├── station_detector.py
-│   │   ├── synthesis.py   # Émissions synthétiques, pour tester sans matériel
-│   │   └── rds/           # RDS : blocs, groupes, encodeur, décodeur
+│   ├── radio/             # FM radio
+│   │   ├── band.py               # FM band plans
+│   │   ├── constants.py          # Deviation, pilot, de-emphasis
+│   │   ├── demo.py               # An invented band, for trying it with no receiver
+│   │   ├── fm_demodulator.py     # Quadrature demodulation, stereo, de-emphasis
+│   │   ├── listener.py           # Continuous audio from a tuned station
+│   │   ├── station.py
+│   │   ├── station_detector.py   # Scan, then identify each station found
+│   │   ├── synthesis.py          # Synthetic transmissions, for testing without hardware
+│   │   └── rds/                  # RDS: blocks, groups, encoder, decoder
 │   │
-│   ├── tv/                # Télévision numérique
-│   │   ├── band.py        # Plans de canaux UHF et VHF
+│   ├── tv/                # Digital television
+│   │   ├── band.py               # UHF and VHF channel plans
+│   │   ├── channel.py
+│   │   ├── demo.py               # Invented multiplexes
 │   │   ├── dvb_scanner.py
-│   │   ├── mux_parser.py
-│   │   ├── psi.py         # Sections PSI, leur CRC et leur réassemblage
+│   │   ├── mux_parser.py         # Collecting a multiplex's tables as they arrive
+│   │   ├── psi.py                # PSI sections, their CRC and reassembly
 │   │   ├── service_parser.py
-│   │   ├── synthesis.py   # Multiplex synthétiques, pour tester sans tuner
-│   │   ├── tables.py      # PAT, PMT, SDT, NIT
-│   │   └── ts.py          # Le paquet de transport de 188 octets
+│   │   ├── synthesis.py          # Synthetic multiplexes, for testing without a tuner
+│   │   ├── tables.py             # PAT, PMT, SDT, NIT
+│   │   └── ts.py                 # The 188-byte transport stream packet
 │   │
-│   ├── sdr/               # Accès aux récepteurs
-│   │   ├── device.py      # Interfaces SdrDevice / DvbDevice
-│   │   ├── rtl_sdr.py
-│   │   ├── soapy_sdr.py
-│   │   ├── mock.py        # Récepteurs simulés utilisés par les tests
-│   │   └── device_manager.py
+│   ├── sdr/               # Receiver access
+│   │   ├── device.py             # SdrDevice / DvbDevice interfaces
+│   │   ├── device_manager.py     # Opening a receiver from a name like "rtlsdr:1"
+│   │   ├── errors.py
+│   │   ├── iq_file.py            # Recording and replaying captures
+│   │   ├── linux_dvb.py          # Linux DVB API — never run on hardware
+│   │   ├── mock.py               # Simulated receivers, used by the whole test suite
+│   │   └── rtl_sdr.py            # RTL-SDR — never run on hardware
 │   │
-│   ├── media/             # Traitement et lecture
-│   │   ├── libvlc.py
+│   ├── media/             # Playback
+│   │   ├── libvlc.py             # A live stream into libVLC through media callbacks
 │   │   ├── stream.py
 │   │   └── wav.py
 │   │
-│   ├── api/               # API HTTP + WebSocket
-│   │   ├── app.py         # Routes, servies sous /api/v1
-│   │   ├── models.py      # Formes des requêtes et des réponses
-│   │   ├── scans.py       # Les scans comme tâches de fond
-│   │   └── streams.py     # Audio sur HTTP
+│   ├── api/               # HTTP + WebSocket API
+│   │   ├── app.py                # Routes, served under /api/v1
+│   │   ├── models.py             # Request and response shapes
+│   │   ├── scans.py              # Scans as background jobs
+│   │   ├── streams.py            # Audio over HTTP
+│   │   ├── spectrum.py           # Spectrum frames over a WebSocket
+│   │   └── favourites.py         # Remembered stations and channels
 │   │
-│   └── cli.py             # Ligne de commande `openwave`
+│   └── cli.py             # `openwave` command line
 │
-├── frontend/              # Interface Angular
+├── frontend/              # Angular interface
+├── scripts/               # Schema export, and the screenshots in this README
+├── packaging/             # udev rules, Debian recipe
 ├── tests/
-└── docs/
-    ├── architecture.md
-    └── legal.md
+└── docs/                  # The documentation site
 ```
 
 | Module | Rôle |
@@ -220,8 +230,8 @@ OpenWave/
 | `core` | Balaye les fréquences, mesure le signal, détecte et regroupe les services trouvés |
 | `radio` | Démodule la FM, décode le RDS, identifie les stations |
 | `tv` | Scanne les canaux DVB, lit les multiplex et en extrait les chaînes |
-| `sdr` | Isole le matériel derrière une interface commune (RTL-SDR, SoapySDR, DVB, simulé) |
-| `media` | Transforme les flux avec FFmpeg et les lit avec libVLC |
+| `sdr` | Isole le matériel derrière une interface commune (RTL-SDR, DVB Linux, captures enregistrées, simulé) |
+| `media` | Emballe un flux en direct en WAV et le lit avec libVLC |
 | `api` | Expose le scan, les stations, les chaînes et les flux à l'interface |
 | `frontend` | Interface Angular : liste, signal, spectre, favoris |
 
@@ -229,7 +239,9 @@ OpenWave/
 
 ## 🧰 Technologies
 
-- **Récepteurs** : RTL-SDR, tuners DVB-T, autres SDR via SoapySDR
+- **Récepteurs** : RTL-SDR et tuners DVB-T Linux, plus les captures enregistrées et un
+  simulateur. SoapySDR, qui apporterait HackRF et Airspy, **n'est pas implémenté** —
+  c'est [matière à issue](docs/compatibility.md), pas une capacité actuelle.
 - **Traitement du signal** : NumPy / SciPy — démodulation FM, décodage RDS, analyse de spectre
 - **Média** : libVLC via `python-vlc`, qui tire un flux live par callbacks
 - **API** : FastAPI, service local exposant les résultats du scan et les flux
@@ -239,13 +251,13 @@ OpenWave/
 
 ## 🗺️ Feuille de route
 
-- [ ] **v0.1** — scan de la bande FM et détection des stations (fréquence, puissance)
-- [ ] **v0.2** — démodulation FM et écoute via libVLC
-- [ ] **v0.3** — décodage RDS (nom de station, RadioText)
-- [ ] **v0.4** — scan DVB-T, lecture des multiplex et liste des chaînes
-- [ ] **v0.5** — API stable (`scan`, `stations`, `channels`, `streams`)
-- [ ] **v0.6** — interface Angular (liste, favoris, signal)
-- [ ] **v0.7** — visualisation du spectre en temps réel
+- [x] **v0.1** — scan de la bande FM et détection des stations (fréquence, puissance)
+- [x] **v0.2** — démodulation FM et écoute via libVLC
+- [x] **v0.3** — décodage RDS (nom de station, RadioText)
+- [x] **v0.4** — scan DVB-T, lecture des multiplex et liste des chaînes
+- [x] **v0.5** — API stable (`scan`, `stations`, `channels`, `streams`)
+- [x] **v0.6** — interface Angular (liste, favoris, signal)
+- [x] **v0.7** — visualisation du spectre en temps réel
 - [x] **v1.0** — documentation complète, packaging pour Linux
 
 Le découpage détaillé en tâches se trouve dans [TASKS.md](TASKS.md).
