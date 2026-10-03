@@ -87,6 +87,8 @@ OpenWave est en développement initial. Rien n'est encore publié.
 | API HTTP (v0.5) | 🟢 en place |
 | Interface Angular (v0.6) | 🟢 en place |
 | Spectre temps réel (v0.7) | 🟢 en place |
+| Site de documentation et packaging (v1.0) | 🟢 en place |
+| Validation sur du matériel réel | 🔴 personne n'a essayé |
 
 **Point d'honnêteté sur le matériel.** Le mainteneur ne dispose pour l'instant ni de clé RTL-SDR ni
 de tuner DVB-T. Chaque étape de traitement du signal est donc développée et testée contre des

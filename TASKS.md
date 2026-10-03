@@ -8,7 +8,7 @@ parallel. Anything marked 🟢 is a good entry point for a first contribution; a
 needs physical hardware and is therefore **blocked on the community** — the maintainer cannot do
 these.
 
-**Legend** — ✅ done · 🚧 in progress · ⬜ not started · 🟢 good first issue · 📡 needs hardware
+**Legend** — ✅ done · 🚧 in progress · ⬜ not started · 🟡 written, waiting on the maintainer to act outside the repository · 🟢 good first issue · 📡 needs hardware
 
 ---
 
@@ -290,10 +290,10 @@ copy of every frame or an FFT that grew by a factor of ten.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 59 | 🟢 | Docs site | MkDocs: install, usage, architecture, API, contributing |
-| 60 | 🟢 📡 | Compatibility matrix | Tested hardware, filled in by the community |
-| 61 | 🟢 | Linux packaging | PyPI wheel plus AppImage or `.deb`, udev rules for RTL-SDR |
-| 62 | 🟢 | Release process | `CHANGELOG.md`, publish workflow, version tags |
+| 59 | ✅ | Docs site | MkDocs: install, usage, architecture, API, contributing |
+| 60 | ✅ 📡 | Compatibility matrix | Tested hardware, filled in by the community |
+| 61 | ✅ | Linux packaging | PyPI wheel plus AppImage or `.deb`, udev rules for RTL-SDR |
+| 62 | ✅ | Release process | `CHANGELOG.md`, publish workflow, version tags |
 
 ### What Phase 9 delivered
 
@@ -339,10 +339,10 @@ silently tunes somewhere else.
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 63 | 🟢 | `good first issue` set | 10 issues with affected files and acceptance criteria |
-| 64 | 🟢 | `hardware validation` issues | One per unvalidated driver (RTL-SDR, DVB-T) |
-| 65 | 🟢 | Labels and milestones | Ten labels, and milestones for the work after v1.0 |
-| 66 | 🟢 | Showcase | Real CI badges, generated CLI and interface pictures |
+| 63 | ✅ | `good first issue` set | 10 issues with affected files and acceptance criteria |
+| 64 | ✅ | `hardware validation` issues | One per unvalidated driver (RTL-SDR, DVB-T) |
+| 65 | ✅ | Labels and milestones | Ten labels, and milestones for the work after v1.0 |
+| 66 | ✅ | Showcase | Real CI badges, generated CLI and interface pictures |
 | 67 | 🟡 | GitHub topics | Listed in `.github/TOPICS.txt`; a repository setting, so set by hand |
 | 68 | 🟡 | Public announcement | Drafted in `.github/ANNOUNCEMENT.md`, to be posted by the maintainer |
 

@@ -87,6 +87,8 @@ OpenWave is in early development. Nothing is released yet.
 | HTTP API (v0.5) | 🟢 in place |
 | Angular interface (v0.6) | 🟢 in place |
 | Real-time spectrum (v0.7) | 🟢 in place |
+| Documentation site and packaging (v1.0) | 🟢 in place |
+| Validation on real hardware | 🔴 nobody has tried |
 
 **Honest note on hardware.** The maintainer currently has no RTL-SDR dongle and no DVB-T tuner.
 Every signal-processing stage is therefore developed and tested against **simulated devices** —
