@@ -1,59 +1,72 @@
-# Frontend
+# OpenWave interface
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 20.3.37.
+The Angular interface for [OpenWave](../README.md): a station list, a channel list and a live
+spectrum, served by the same process that serves the API.
 
-## Development server
+## Running it
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+The backend serves the built interface, so for ordinary use there is nothing to run here:
 
 ```bash
-ng generate component component-name
+npm run build          # once, from this directory
+openwave serve --demo  # from the repository root
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+Then open http://127.0.0.1:8000.
+
+For working on the interface itself, run the dev server alongside the backend:
 
 ```bash
-ng generate --help
+openwave serve --demo   # terminal one, from the repository root
+npm start               # terminal two, from here
 ```
 
-## Building
+`npm start` proxies the API to the backend, so the two reload independently.
 
-To build the project run:
+## The API types are generated, not written
+
+Everything in `src/app/api/schema.d.ts` comes from the backend's own OpenAPI document:
 
 ```bash
-ng build
+npm run generate:api
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+The schema is checked in at `openapi.json`, written by `python scripts/export_openapi.py`. That
+means two things worth knowing. The interface can be built without a running backend. And a
+change to a response in Python becomes a compile error here rather than a field that is quietly
+`undefined` at run time — which is the whole reason for generating it rather than writing the
+types by hand.
 
-## Running unit tests
+If a build fails with a type error after pulling, regenerate the types.
 
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+## Checks
 
 ```bash
-ng test
+npm run build   # also the type check: Angular compiles templates as well as TypeScript
+npm test        # unit tests, in a headless browser
 ```
 
-## Running end-to-end tests
+There is no separate lint step. Building is the real check: Angular compiles the templates, so a
+template referring to a field the API no longer returns fails the build.
 
-For end-to-end (e2e) testing, run:
+## How it is put together
 
-```bash
-ng e2e
-```
+| Path | What it is |
+|---|---|
+| `src/app/api/` | The generated types, and the one service that talks to OpenWave |
+| `src/app/stations/` | The FM station list, with favourites and playback |
+| `src/app/channels/` | The television channel list, grouped by multiplex |
+| `src/app/spectrum/` | The live spectrum and waterfall, and the frame decoder |
+| `src/app/shared/` | The signal meter, the scan panel, the favourite button |
+| `src/styles.scss` | Colour tokens and the base styles, dark by default |
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+A few decisions that are easier to find here than in the code:
 
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+- **Views are loaded on demand.** Somebody who only wants a station list should not wait for the
+  canvas drawing the spectrum view needs.
+- **The spectrum is a canvas, not elements.** A thousand bins twenty times a second is twenty
+  thousand DOM updates a second; one canvas draw is a few hundred microseconds.
+- **Audio is a URL, not data.** The browser's own audio element pulls the stream from the API,
+  so nothing is decoded here and VLC on another machine can play the same URL.
+- **The API address is derived from the page**, never configured. The backend serves this
+  interface, so hard-coding a host would break every deployment but the developer's own.

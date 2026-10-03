@@ -1,0 +1,101 @@
+<header class="page-head">
+  <div>
+    <h1>FM stations</h1>
+    <p class="subtitle">
+      @if (stations().length) {
+        {{ stations().length }} found, {{ stereoCount() }} in stereo
+      } @else if (scanned()) {
+        Nothing found on the last scan
+      } @else {
+        Scan the band to see what is on the air
+      }
+    </p>
+  </div>
+
+  <div class="actions">
+    <label class="toggle">
+      <input
+        type="checkbox"
+        [checked]="readRds()"
+        (change)="readRds.set($any($event.target).checked)"
+      />
+      Read RDS
+      <span class="hint">slower, but gives station names</span>
+    </label>
+    <ow-scan-panel
+      band="fm"
+      label="Scan the FM band"
+      [options]="scanOptions()"
+      (finished)="onScanned()"
+    />
+  </div>
+</header>
+
+@if (failure(); as problem) {
+  <p class="failure" role="alert">
+    <strong>{{ problem.error }}</strong>
+    {{ problem.detail }}
+  </p>
+}
+
+@if (loading()) {
+  <p class="muted">Loading…</p>
+} @else if (!stations().length) {
+  <div class="empty">
+    <p>No stations yet.</p>
+    <p class="muted">
+      Run a scan. With no receiver attached, start the server with
+      <code>openwave serve --demo</code> to see what a scan looks like against an invented band.
+    </p>
+  </div>
+} @else {
+  <table class="listing">
+    <caption class="visually-hidden">FM stations found by the last scan</caption>
+    <thead>
+      <tr>
+        <th scope="col" class="star-column"><span class="visually-hidden">Favourite</span></th>
+        <th scope="col">Station</th>
+        <th scope="col" class="numeric">MHz</th>
+        <th scope="col">Signal</th>
+        <th scope="col">Mode</th>
+        <th scope="col">Text</th>
+        <th scope="col"><span class="visually-hidden">Listen</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (station of stations(); track station.freq_hz) {
+        <tr [class.playing]="playing()?.freq_hz === station.freq_hz">
+          <td class="star-column">
+            <ow-favourite-button
+              [favourite]="asFavourite(station)"
+              [isFavourite]="isFavourite(station)"
+              (changed)="onFavouriteChanged()"
+              (failed)="onFavouriteFailed($event)"
+            />
+          </td>
+          <td class="name">{{ label(station) }}</td>
+          <td class="numeric">{{ megahertz(station) }}</td>
+          <td><ow-signal-meter [snrDb]="station.snr_db" /></td>
+          <td class="mode" [class.unchecked]="mode(station) === 'unchecked'">
+            {{ mode(station) }}
+          </td>
+          <td class="text">{{ station.radio_text ?? '' }}</td>
+          <td class="listen">
+            <button type="button" (click)="listen(station)">
+              {{ playing()?.freq_hz === station.freq_hz ? 'Stop' : 'Listen' }}
+            </button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  @if (playing(); as station) {
+    <div class="player">
+      <span class="now">Listening to <strong>{{ label(station) }}</strong></span>
+      <!-- The browser's own audio element pulls the stream. Nothing is decoded here: the
+           server already turned radio into WAV, and anything that plays WAV can play it. -->
+      <audio [src]="streamUrl(station)" controls autoplay></audio>
+    </div>
+  }
+}

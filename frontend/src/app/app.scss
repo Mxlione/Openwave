@@ -1,0 +1,96 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Visible only when focused, which is how a keyboard user skips the navigation. */
+.skip {
+  position: absolute;
+  left: -100vw;
+  top: 0.5rem;
+  z-index: 10;
+  padding: 0.5rem 0.875rem;
+  background: var(--ow-accent);
+  color: #04121c;
+  border-radius: 0.375rem;
+  font-weight: 600;
+}
+
+.skip:focus {
+  left: 0.5rem;
+}
+
+.chrome {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--ow-surface);
+  border-bottom: 1px solid var(--ow-border);
+}
+
+footer.chrome {
+  border-bottom: none;
+  border-top: 1px solid var(--ow-border);
+  margin-top: auto;
+  font-size: 0.75rem;
+  color: var(--ow-text-dim);
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+footer .absent {
+  color: var(--ow-poor);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.mark {
+  font-size: 1.125rem;
+}
+
+nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+nav a {
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  color: var(--ow-text-dim);
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+
+nav a:hover {
+  background: var(--ow-surface-sunken);
+  color: var(--ow-text);
+}
+
+nav a.active {
+  background: var(--ow-surface-sunken);
+  color: var(--ow-text);
+  font-weight: 500;
+}
+
+main {
+  flex: 1;
+  width: 100%;
+  max-width: 70rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+
+@media (max-width: 30rem) {
+  .chrome {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+}

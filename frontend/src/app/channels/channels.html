@@ -1,0 +1,97 @@
+<header class="page-head">
+  <div>
+    <h1>Television channels</h1>
+    <p class="subtitle">
+      @if (channels().length) {
+        {{ channels().length }} services in {{ multiplexes().length }} multiplexes
+      } @else if (scanned()) {
+        Nothing found on the last scan
+      } @else {
+        Scan a television band to see what is on the air
+      }
+    </p>
+  </div>
+
+  <div class="actions">
+    <label class="band">
+      Band
+      <select [value]="band()" (change)="band.set($any($event.target).value)">
+        <option value="uhf">UHF (channels 21–48)</option>
+        <option value="vhf">VHF band III (channels 5–12)</option>
+      </select>
+    </label>
+    <ow-scan-panel
+      band="tv"
+      label="Scan for channels"
+      [options]="scanOptions()"
+      (finished)="onScanned()"
+    />
+  </div>
+</header>
+
+@if (failure(); as problem) {
+  <p class="failure" role="alert">
+    <strong>{{ problem.error }}</strong>
+    {{ problem.detail }}
+  </p>
+}
+
+@if (loading()) {
+  <p class="muted">Loading…</p>
+} @else if (!channels().length) {
+  <div class="empty">
+    <p>No channels yet.</p>
+    <p class="muted">
+      Run a scan. A television scan tunes every channel of the band in turn and waits for the
+      demodulator to lock, so it takes a while. With no tuner attached, start the server with
+      <code>openwave serve --demo</code>.
+    </p>
+  </div>
+} @else {
+  @for (multiplex of multiplexes(); track multiplex.freqHz) {
+    <section class="multiplex">
+      <header>
+        <h2>{{ multiplex.label }}</h2>
+        <span class="count">
+          {{ multiplex.channels.length }}
+          {{ multiplex.channels.length === 1 ? 'service' : 'services' }}
+        </span>
+        @if (multiplex.snrDb !== null) {
+          <!-- One figure for the whole group: they share a transmission, so they share its
+               signal, and they all fail together. -->
+          <ow-signal-meter [snrDb]="multiplex.snrDb" />
+        }
+      </header>
+
+      <table class="listing">
+        <tbody>
+          @for (channel of multiplex.channels; track channel.service_id) {
+            <tr [class.unwatchable]="channel.scrambled">
+              <td class="star-column">
+                <ow-favourite-button
+                  [favourite]="asFavourite(channel)"
+                  [isFavourite]="isFavourite(channel)"
+                  (changed)="onFavouriteChanged()"
+                  (failed)="onFavouriteFailed($event)"
+                />
+              </td>
+              <td class="number">
+                {{ channel.logical_channel !== null ? channel.logical_channel : '—' }}
+              </td>
+              <td class="name">
+                {{ channel.name }}
+                @if (channel.scrambled) {
+                  <span class="badge" title="Encrypted: OpenWave reports it and goes no further">
+                    scrambled
+                  </span>
+                }
+              </td>
+              <td class="kind">{{ kind(channel) }}</td>
+              <td class="provider">{{ channel.provider ?? '' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+}

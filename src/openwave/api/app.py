@@ -20,10 +20,15 @@ import asyncio
 import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Final
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.responses import Response
+from starlette.types import Scope
 
 from openwave import __version__
 from openwave.api.favourites import Favourite, FavouriteKind, FavouriteStore
@@ -140,7 +145,72 @@ def create_app(
         spectrum=spectrum,
         favourites=favourites,
     )
+    # After the routes, never before: a mount at "/" matches every path, so registering it
+    # first would swallow the API entirely.
+    _mount_interface(app)
     return app
+
+
+#: Where the built Angular interface is looked for.
+#:
+#: Relative to the installed package, so that a wheel carrying the built files serves them and
+#: a checkout that has not run ``npm run build`` simply does not. Angular 20 puts its output in
+#: a ``browser`` subdirectory.
+INTERFACE_ROOT: Final = (
+    Path(__file__).resolve().parents[3] / "frontend" / "dist" / "frontend" / "browser"
+)
+
+
+class _SinglePageFiles(StaticFiles):
+    """Static files that fall back to ``index.html`` for anything they do not have.
+
+    A routed single-page application needs this. ``/stations`` is a route the browser resolves
+    once the application has loaded, not a file on disk -- but somebody who bookmarks it, or
+    reloads the page, asks the server for it directly. Plain static files answer 404, and the
+    person sees nothing.
+
+    Two things do *not* fall back.
+
+    Anything under the API prefix, because a client that calls a mistyped endpoint must get a
+    404 it can recognise. Handing it a page of HTML to parse as JSON turns a typo into a
+    baffling error a long way from its cause.
+
+    Anything that is not a ``GET`` or a ``HEAD``, because a POST to a route that does not exist
+    is a mistake rather than a page somebody is trying to open.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as error:
+            if error.status_code != status.HTTP_404_NOT_FOUND:
+                raise
+            if scope.get("method", "GET") not in ("GET", "HEAD"):
+                raise
+            if path.startswith(API_PREFIX.lstrip("/")):
+                raise
+            return await super().get_response("index.html", scope)
+
+
+def _mount_interface(app: FastAPI) -> None:
+    """Serve the built interface, if there is one.
+
+    One process serving both the API and the interface means no second port, no proxy
+    configuration, and no cross-origin rules to get wrong. It also means the interface can
+    derive its own API address from the page it was loaded from rather than being told.
+
+    Absent silently when the interface has not been built: a backend developer should not have
+    to install Node to run the API, and ``openwave serve`` says where to find the documentation
+    either way.
+    """
+    if not (INTERFACE_ROOT / "index.html").is_file():
+        return
+
+    app.mount(
+        "/",
+        _SinglePageFiles(directory=INTERFACE_ROOT, html=True),
+        name="interface",
+    )
 
 
 def _register_error_handlers(app: FastAPI) -> None:

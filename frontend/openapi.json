@@ -1,0 +1,1425 @@
+{
+  "components": {
+    "schemas": {
+      "Band": {
+        "description": "Which band a scan covers.",
+        "enum": [
+          "fm",
+          "tv"
+        ],
+        "title": "Band",
+        "type": "string"
+      },
+      "Capabilities": {
+        "description": "What this installation can actually do.\n\nWorth asking before offering a button that cannot work: playback needs libVLC, the RTL-SDR\ndriver needs its optional extra, and a scan needs a receiver.",
+        "properties": {
+          "libvlc_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "libVLC version, if present",
+            "title": "Libvlc Version"
+          },
+          "playback": {
+            "description": "Whether audio can be played, which needs libVLC",
+            "title": "Playback",
+            "type": "boolean"
+          },
+          "receivers": {
+            "description": "How many IQ receivers were found",
+            "minimum": 0.0,
+            "title": "Receivers",
+            "type": "integer"
+          },
+          "rtlsdr": {
+            "description": "Whether the RTL-SDR driver's dependency is installed",
+            "title": "Rtlsdr",
+            "type": "boolean"
+          },
+          "tuners": {
+            "description": "How many DVB tuners were found",
+            "minimum": 0.0,
+            "title": "Tuners",
+            "type": "integer"
+          },
+          "version": {
+            "description": "OpenWave version",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "playback",
+          "rtlsdr",
+          "receivers",
+          "tuners"
+        ],
+        "title": "Capabilities",
+        "type": "object"
+      },
+      "Channel": {
+        "description": "One digital television or radio service, as found by a scan.",
+        "properties": {
+          "audio_pid": {
+            "anyOf": [
+              {
+                "maximum": 8191.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PID of the first audio stream",
+            "title": "Audio Pid"
+          },
+          "logical_channel": {
+            "anyOf": [
+              {
+                "maximum": 1023.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The number a viewer types. Published by the network in a private descriptor rather than by the standard, so plenty of multiplexes do not carry it.",
+            "title": "Logical Channel"
+          },
+          "mux_freq_hz": {
+            "description": "Centre frequency of the multiplex carrying this service",
+            "exclusiveMinimum": 0.0,
+            "title": "Mux Freq Hz",
+            "type": "number"
+          },
+          "name": {
+            "description": "What the service is called, from the Service Description Table",
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who runs the service",
+            "title": "Provider"
+          },
+          "running": {
+            "default": true,
+            "description": "Whether the service is on the air now",
+            "title": "Running",
+            "type": "boolean"
+          },
+          "scrambled": {
+            "default": false,
+            "description": "Whether access is controlled. OpenWave reports this and goes no further: see docs/legal.md.",
+            "title": "Scrambled",
+            "type": "boolean"
+          },
+          "service_id": {
+            "description": "Identifier within the multiplex, which is also its programme number",
+            "exclusiveMinimum": 0.0,
+            "maximum": 65535.0,
+            "title": "Service Id",
+            "type": "integer"
+          },
+          "service_type": {
+            "description": "Service type from EN 300 468. Kept as a number because the list is long, country-specific in places, and still growing.",
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Service Type",
+            "type": "integer"
+          },
+          "snr_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Carrier-to-noise ratio the tuner reported for the multiplex",
+            "title": "Snr Db"
+          },
+          "strength_dbm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signal strength the tuner reported, where it provides one",
+            "title": "Strength Dbm"
+          },
+          "transport_stream_id": {
+            "description": "Identifier of the multiplex carrying this service",
+            "maximum": 65535.0,
+            "minimum": 0.0,
+            "title": "Transport Stream Id",
+            "type": "integer"
+          },
+          "video_pid": {
+            "anyOf": [
+              {
+                "maximum": 8191.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "PID of the video stream, if there is one",
+            "title": "Video Pid"
+          }
+        },
+        "required": [
+          "name",
+          "service_id",
+          "mux_freq_hz",
+          "transport_stream_id",
+          "service_type"
+        ],
+        "title": "Channel",
+        "type": "object"
+      },
+      "DeviceSummary": {
+        "description": "One receiver or tuner, as a device picker needs it.",
+        "properties": {
+          "driver": {
+            "title": "Driver",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "Whether this produces IQ samples or a demodulated transport stream",
+            "enum": [
+              "receiver",
+              "tuner"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "serial": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Serial"
+          },
+          "spec": {
+            "description": "What to pass as the device, such as 'rtlsdr:1'",
+            "title": "Spec",
+            "type": "string"
+          },
+          "validated_on_hardware": {
+            "description": "Whether this driver has ever been run against the hardware it targets. False for the real receivers: the maintainer owns none, so they are written from the vendor interfaces and unverified. A client should say so rather than imply otherwise.",
+            "title": "Validated On Hardware",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "spec",
+          "driver",
+          "index",
+          "label",
+          "kind",
+          "validated_on_hardware"
+        ],
+        "title": "DeviceSummary",
+        "type": "object"
+      },
+      "Favourite": {
+        "description": "One remembered station or channel.",
+        "properties": {
+          "added_at": {
+            "description": "When it was added",
+            "format": "date-time",
+            "title": "Added At",
+            "type": "string"
+          },
+          "freq_hz": {
+            "description": "For a station, its carrier; for a channel, the frequency of the multiplex carrying it.",
+            "exclusiveMinimum": 0.0,
+            "title": "Freq Hz",
+            "type": "number"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FavouriteKind"
+          },
+          "name": {
+            "description": "What to call it in a list",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "service_id": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Which service within a multiplex, for a television channel",
+            "title": "Service Id"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "freq_hz"
+        ],
+        "title": "Favourite",
+        "type": "object"
+      },
+      "FavouriteKind": {
+        "description": "What kind of thing has been marked as a favourite.",
+        "enum": [
+          "station",
+          "channel"
+        ],
+        "title": "FavouriteKind",
+        "type": "string"
+      },
+      "FmScanResults": {
+        "description": "What an FM scan found.",
+        "properties": {
+          "channels_measured": {
+            "minimum": 0.0,
+            "title": "Channels Measured",
+            "type": "integer"
+          },
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "coverage": {
+            "description": "Fraction of the band the receiver could reach. Below one when replaying a capture, which holds a single window of spectrum.",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Coverage",
+            "type": "number"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          },
+          "sample_rate_hz": {
+            "title": "Sample Rate Hz",
+            "type": "number"
+          },
+          "stations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Station"
+            },
+            "title": "Stations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plan",
+          "sample_rate_hz",
+          "channels_measured",
+          "coverage",
+          "complete"
+        ],
+        "title": "FmScanResults",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "MultiplexSummary": {
+        "description": "One multiplex a television scan locked onto.",
+        "properties": {
+          "bandwidth_hz": {
+            "title": "Bandwidth Hz",
+            "type": "number"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Channel number on the plan scanned",
+            "title": "Channel"
+          },
+          "freq_hz": {
+            "title": "Freq Hz",
+            "type": "number"
+          },
+          "network_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Network Name"
+          },
+          "services": {
+            "minimum": 0.0,
+            "title": "Services",
+            "type": "integer"
+          },
+          "snr_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snr Db"
+          },
+          "transport_stream_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport Stream Id"
+          }
+        },
+        "required": [
+          "freq_hz",
+          "bandwidth_hz",
+          "services"
+        ],
+        "title": "MultiplexSummary",
+        "type": "object"
+      },
+      "ScanDetail": {
+        "description": "A scan with its results.",
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the scan failed, when it did",
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "fm": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FmScanResults"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScanProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ScanState"
+          },
+          "tv": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TvScanResults"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "band",
+          "state",
+          "started_at"
+        ],
+        "title": "ScanDetail",
+        "type": "object"
+      },
+      "ScanProgress": {
+        "description": "How far a scan has got.",
+        "properties": {
+          "done": {
+            "description": "Steps completed",
+            "minimum": 0.0,
+            "title": "Done",
+            "type": "integer"
+          },
+          "frequency_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where the receiver is at this moment",
+            "title": "Frequency Hz"
+          },
+          "stage": {
+            "description": "What the scan is doing, in words a person can read",
+            "title": "Stage",
+            "type": "string"
+          },
+          "total": {
+            "description": "Steps in this stage, or zero if not yet known",
+            "minimum": 0.0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stage",
+          "done",
+          "total"
+        ],
+        "title": "ScanProgress",
+        "type": "object"
+      },
+      "ScanRequest": {
+        "description": "What to scan, and how thoroughly.",
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band",
+            "default": "fm",
+            "description": "Which band to sweep"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Receiver or tuner to use. Defaults to whatever the server was started with.",
+            "title": "Device"
+          },
+          "identify": {
+            "default": true,
+            "description": "Whether to demodulate each FM station to decide stereo",
+            "title": "Identify",
+            "type": "boolean"
+          },
+          "include_scrambled": {
+            "default": true,
+            "description": "Whether to list television services that are encrypted",
+            "title": "Include Scrambled",
+            "type": "boolean"
+          },
+          "lock_timeout_s": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds to give a DVB demodulator to lock onto each channel",
+            "title": "Lock Timeout S"
+          },
+          "plan": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Band plan: 'fm' or 'fm-japan' for radio, 'uhf' or 'vhf' for television",
+            "title": "Plan"
+          },
+          "rds": {
+            "default": true,
+            "description": "Whether to read RDS, which is what fills in station names. It needs about a second of signal per station and so dominates how long a scan takes.",
+            "title": "Rds",
+            "type": "boolean"
+          },
+          "sample_rate_hz": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample rate for an FM scan",
+            "title": "Sample Rate Hz"
+          },
+          "threshold_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signal-to-noise ratio for an FM channel to count as occupied",
+            "title": "Threshold Db"
+          }
+        },
+        "title": "ScanRequest",
+        "type": "object"
+      },
+      "ScanState": {
+        "description": "Where a scan has got to.\n\nA scan takes seconds for FM and up to a minute for television, which is far too long for an\nHTTP request to wait on. So a scan is a job: it is started, it progresses, and its result is\ncollected afterwards.",
+        "enum": [
+          "pending",
+          "running",
+          "complete",
+          "failed",
+          "cancelled"
+        ],
+        "title": "ScanState",
+        "type": "string"
+      },
+      "ScanSummary": {
+        "description": "A scan without its results, for a listing.",
+        "properties": {
+          "band": {
+            "$ref": "#/components/schemas/Band"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the scan failed, when it did",
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScanProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ScanState"
+          }
+        },
+        "required": [
+          "id",
+          "band",
+          "state",
+          "started_at"
+        ],
+        "title": "ScanSummary",
+        "type": "object"
+      },
+      "Station": {
+        "description": "One FM broadcast station, as found by a scan.\n\nLevels are in dBFS, relative to full scale. A consumer SDR has no calibrated power\nreference, so comparisons between stations and signal-to-noise ratios are meaningful while\nabsolute power is not. See :mod:`openwave.core.units`.",
+        "properties": {
+          "bandwidth_hz": {
+            "description": "Channel bandwidth the power was measured over",
+            "exclusiveMinimum": 0.0,
+            "title": "Bandwidth Hz",
+            "type": "number"
+          },
+          "freq_hz": {
+            "description": "Carrier frequency in hertz",
+            "exclusiveMinimum": 0.0,
+            "title": "Freq Hz",
+            "type": "number"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Station name, from the RDS programme service field.",
+            "title": "Name"
+          },
+          "pi": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "RDS programme identification: a 16-bit code identifying the station within its country. Transmitters carrying the same programme share it, which is how a receiver follows a station across frequencies.",
+            "title": "Pi"
+          },
+          "pilot_level_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How far the 19 kHz pilot stood above the multiplex around it, when checked",
+            "title": "Pilot Level Db"
+          },
+          "power_dbfs": {
+            "description": "Channel power relative to full scale",
+            "title": "Power Dbfs",
+            "type": "number"
+          },
+          "pty": {
+            "anyOf": [
+              {
+                "maximum": 31.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "RDS programme type, as the raw five-bit number. Europe and North America assign the same bits to different genres, so the number is kept rather than a label.",
+            "title": "Pty"
+          },
+          "radio_text": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "RDS RadioText: a longer free-text field, often the programme or track.",
+            "title": "Radio Text"
+          },
+          "snr_db": {
+            "description": "How far the channel stands above the noise floor",
+            "title": "Snr Db",
+            "type": "number"
+          },
+          "stereo": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether a stereo pilot was found. None means it was not checked: a band scan measures power only, and deciding stereo needs the station demodulated.",
+            "title": "Stereo"
+          }
+        },
+        "required": [
+          "freq_hz",
+          "power_dbfs",
+          "snr_db",
+          "bandwidth_hz"
+        ],
+        "title": "Station",
+        "type": "object"
+      },
+      "TvScanResults": {
+        "description": "What a television scan found.",
+        "properties": {
+          "channels": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Channel"
+            },
+            "title": "Channels",
+            "type": "array"
+          },
+          "channels_tried": {
+            "minimum": 0.0,
+            "title": "Channels Tried",
+            "type": "integer"
+          },
+          "incomplete": {
+            "default": [],
+            "description": "Frequencies that locked but whose tables never arrived. Reported separately because the signal being present and unreadable usually means marginal reception.",
+            "items": {
+              "type": "number"
+            },
+            "title": "Incomplete",
+            "type": "array"
+          },
+          "multiplexes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/MultiplexSummary"
+            },
+            "title": "Multiplexes",
+            "type": "array"
+          },
+          "plan": {
+            "title": "Plan",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan",
+          "channels_tried"
+        ],
+        "title": "TvScanResults",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Every scan is a background job: start one with POST /api/v1/scans, then collect its result or watch its progress. Levels are in dBFS rather than dBm, because a consumer receiver has no calibrated power reference.",
+    "summary": "Scan, detect and play publicly broadcast radio and TV services.",
+    "title": "OpenWave",
+    "version": "0.1.0.dev0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/channels": {
+      "get": {
+        "description": "The services found by the most recent completed television scan.",
+        "operationId": "channels_api_v1_channels_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Channel"
+                  },
+                  "title": "Response Channels Api V1 Channels Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Channels",
+        "tags": [
+          "results"
+        ]
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "description": "Every receiver and tuner that can currently be opened.",
+        "operationId": "devices_api_v1_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceSummary"
+                  },
+                  "title": "Response Devices Api V1 Devices Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Devices",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/favourites": {
+      "delete": {
+        "description": "Forget a station or channel.\n\nForgetting something that was not remembered is not an error: a client that sends the\nsame request twice, or that is out of step with another client, should end up with the\nstate it asked for rather than an error to handle.",
+        "operationId": "remove_favourite_api_v1_favourites_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Favourite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Favourite",
+        "tags": [
+          "favourites"
+        ]
+      },
+      "get": {
+        "description": "Every remembered station and channel, in frequency order.\n\nKept by the server rather than the browser: a receiver is a thing in a room, reached\nfrom a laptop, a phone and a television, and a list held in one browser's storage is\ninvisible to the other two.",
+        "operationId": "list_favourites_api_v1_favourites_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/FavouriteKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Favourite"
+                  },
+                  "title": "Response List Favourites Api V1 Favourites Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Favourites",
+        "tags": [
+          "favourites"
+        ]
+      },
+      "post": {
+        "description": "Remember a station or channel.\n\nAdding something already remembered replaces it, so a renamed station keeps its place\nrather than appearing twice.",
+        "operationId": "add_favourite_api_v1_favourites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Favourite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Favourite"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Favourite",
+        "tags": [
+          "favourites"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "What this installation can do.\n\nWorth asking before offering a button that cannot work: playback needs libVLC, and a\nscan needs a receiver.",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/v1/scans": {
+      "get": {
+        "description": "Every remembered scan, newest first.",
+        "operationId": "list_scans_api_v1_scans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScanSummary"
+                  },
+                  "title": "Response List Scans Api V1 Scans Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Scans",
+        "tags": [
+          "scans"
+        ]
+      },
+      "post": {
+        "description": "Start a scan.\n\nReturns at once with an identifier. The scan itself runs in the background, because an\nFM sweep takes seconds and a television sweep up to a minute.",
+        "operationId": "start_scan_api_v1_scans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Scan",
+        "tags": [
+          "scans"
+        ]
+      }
+    },
+    "/api/v1/scans/{scan_id}": {
+      "delete": {
+        "description": "Ask a scan to stop.\n\nA scan in progress finishes the segment it is on rather than being killed: a receiver\nabandoned mid-read leaves a mess for the next caller.",
+        "operationId": "cancel_scan_api_v1_scans__scan_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scan_id",
+            "required": true,
+            "schema": {
+              "title": "Scan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Scan",
+        "tags": [
+          "scans"
+        ]
+      },
+      "get": {
+        "description": "One scan, with its results once it has finished.",
+        "operationId": "scan_detail_api_v1_scans__scan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "scan_id",
+            "required": true,
+            "schema": {
+              "title": "Scan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Scan Detail",
+        "tags": [
+          "scans"
+        ]
+      }
+    },
+    "/api/v1/spectrum": {
+      "get": {
+        "description": "How the spectrum feed is configured, and whether anybody is watching.",
+        "operationId": "spectrum_status_api_v1_spectrum_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Spectrum Status Api V1 Spectrum Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Spectrum Status",
+        "tags": [
+          "streams"
+        ]
+      }
+    },
+    "/api/v1/stations": {
+      "get": {
+        "description": "The stations found by the most recent completed FM scan.\n\nEmpty until one has run, which is different from a scan that found nothing -- the scan\nlist says which.",
+        "operationId": "stations_api_v1_stations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Station"
+                  },
+                  "title": "Response Stations Api V1 Stations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stations",
+        "tags": [
+          "results"
+        ]
+      }
+    },
+    "/api/v1/streams": {
+      "get": {
+        "description": "What is being streamed, if anything.",
+        "operationId": "stream_status_api_v1_streams_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Stream Status Api V1 Streams Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stream Status",
+        "tags": [
+          "streams"
+        ]
+      }
+    },
+    "/api/v1/streams/fm/{freq_hz}": {
+      "get": {
+        "description": "Play an FM station as a WAV stream.\n\nThe frontend does not decode radio: it points a player at this URL. Anything that\nunderstands WAV over HTTP can play it, including libVLC and a browser.\n\nArgs:\n    freq_hz: The station to tune.\n    seconds: Stop after this much audio, giving a finite clip. Without it the stream\n        runs until the client goes away, which is what live listening wants.",
+        "operationId": "stream_fm_api_v1_streams_fm__freq_hz__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "freq_hz",
+            "required": true,
+            "schema": {
+              "title": "Freq Hz",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stream Fm",
+        "tags": [
+          "streams"
+        ]
+      }
+    }
+  }
+}

@@ -69,8 +69,8 @@ OpenWave est en développement initial. Rien n'est encore publié.
 | Décodage RDS (v0.3) | 🟢 en place |
 | Scan DVB-T (v0.4) | 🟢 en place |
 | API HTTP (v0.5) | 🟢 en place |
-| Interface Angular (v0.6) | 🔴 à faire |
-| Spectre temps réel (v0.7) | 🔴 à faire |
+| Interface Angular (v0.6) | 🟢 en place |
+| Spectre temps réel (v0.7) | 🟡 affichage fait, budget de performance à venir |
 
 **Point d'honnêteté sur le matériel.** Le mainteneur ne dispose pour l'instant ni de clé RTL-SDR ni
 de tuner DVB-T. Chaque étape de traitement du signal est donc développée et testée contre des

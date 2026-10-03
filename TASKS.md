@@ -219,21 +219,53 @@ Decisions worth recording:
 
 | # | Status | Task | Detail |
 |---|---|---|---|
-| 48 | ⬜ | Angular scaffold | Structure, routing, dark theme |
-| 49 | ⬜ | Typed API client | Generated from the OpenAPI schema |
-| 50 | ⬜ | FM station view | List, frequency, strength, RDS name, Listen button |
-| 51 | ⬜ | TV channel view | Grouped by multiplex, Watch button |
-| 52 | ⬜ 🟢 | Signal meter | Strength and SNR gauge |
-| 53 | 🟡 | Favourites | Server-side persistence done; the interface for them comes with the Angular views |
-| 54 | ⬜ | Frontend CI | Angular build verified, served statically by FastAPI |
+| 48 | ✅ | Angular scaffold | Structure, routing, dark theme |
+| 49 | ✅ | Typed API client | Generated from the OpenAPI schema |
+| 50 | ✅ | FM station view | List, frequency, strength, RDS name, Listen button |
+| 51 | ✅ | TV channel view | Grouped by multiplex, Watch button |
+| 52 | ✅ | Signal meter | Strength and SNR gauge |
+| 53 | ✅ | Favourites | Server-side persistence done; the interface for them comes with the Angular views |
+| 54 | ✅ | Frontend CI | Angular build verified, served statically by FastAPI |
+
+**What Phase 7 delivered.** An interface at the same address as the API: a station list with
+favourites and a play button, a channel list grouped by multiplex, and a live spectrum with a
+waterfall. Three views, loaded on demand, 83 kB over the wire for the first one.
+
+Decisions worth recording:
+
+- **The API types are generated from the backend's own schema**, which is checked in. A change
+  to a response in Python becomes a compile error in the interface rather than a field that is
+  quietly `undefined` at run time, and CI fails if the schema and the generated types drift
+  apart.
+- **One process serves both.** No second port, no proxy configuration, no cross-origin rules,
+  and the interface derives its own API address from the page it was loaded from. The catch-all
+  that makes browser routes work is careful to exclude the API prefix: handing a client HTML to
+  parse as JSON turns a typo into a baffling error a long way from its cause.
+- **The spectrum is drawn on a canvas.** A thousand bins twenty times a second is twenty
+  thousand DOM updates a second. The waterfall scrolls its own pixels up by one row rather than
+  redrawing its history, which does not change.
+- **The waterfall's colour scale is pinned, not automatic.** Following the loudest bin uses the
+  full range but makes an unchanging signal appear to change colour as something else comes and
+  goes elsewhere in the span.
+- **Audio is a URL.** The browser's own audio element pulls the stream, so nothing is decoded in
+  the interface and VLC on another machine can play the same address.
+- **What does not work is said where somebody will see it.** The footer reports the version, how
+  many receivers and tuners were found, whether playback is available, and whether the RTL-SDR
+  driver is installed — because the honest answer to "why does the scan find nothing?" is
+  usually one of those.
+
+Two environment notes for contributors. The Angular CLI installed globally on the maintainer's
+machine was version 14, which refuses Node 20; the project pins its own CLI in
+`devDependencies`, which is what a repository should do anyway. And the current Angular CLI
+needs Node 22, so the project is on Angular 20, which accepts Node 20.19 and above.
 
 ## Phase 8 — v0.7 · Real-time spectrum
 
 | # | Status | Task | Detail |
 |---|---|---|---|
 | 55 | ✅ | Continuous PSD feed | Binary WebSocket frames at 1 kB each, averaged down server-side rather than decimated — a decimated spectrum misses narrow signals, which on a display looks like a station flickering |
-| 56 | ⬜ | Spectrum display | Canvas/WebGL, dB scale, station markers |
-| 57 | ⬜ | Waterfall | Time cascade with a colour palette |
+| 56 | ✅ | Spectrum display | Canvas/WebGL, dB scale, station markers |
+| 57 | ✅ | Waterfall | Time cascade with a colour palette |
 | 58 | ⬜ | Performance budget | Throughput and latency measured, regression-tested |
 
 ## Phase 9 — v1.0 · Documentation and packaging

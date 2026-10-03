@@ -1,0 +1,64 @@
+<header class="page-head">
+  <div>
+    <h1>Spectrum</h1>
+    <p class="subtitle">
+      What is on the air right now, and what has been for the last few seconds.
+    </p>
+  </div>
+
+  <div class="controls">
+    <label class="tune">
+      Centre
+      <input
+        type="number"
+        step="0.1"
+        min="76"
+        max="108"
+        [value]="frequencyMhz()"
+        (change)="frequencyMhz.set($any($event.target).valueAsNumber)"
+        [disabled]="running()"
+      />
+      MHz
+    </label>
+    <button type="button" class="primary" (click)="toggle()">
+      {{ running() ? 'Stop' : 'Start' }}
+    </button>
+  </div>
+</header>
+
+@if (problem(); as message) {
+  <p class="failure" role="alert">{{ message }}</p>
+}
+
+<div class="readout">
+  <span>Span {{ span() }}</span>
+  <span>{{ framesSeen() }} frames</span>
+  @if (hover(); as point) {
+    <span class="pointer">
+      {{ formatHz(point.hz) }} · {{ point.dbfs.toFixed(1) }} dBFS
+    </span>
+  } @else if (running()) {
+    <span class="muted">Point at the display to read a frequency</span>
+  }
+</div>
+
+<div class="displays">
+  <!-- Drawn on canvases rather than with elements: a thousand bins twenty times a second is
+       twenty thousand DOM updates per second, and one canvas draw is a few hundred
+       microseconds. -->
+  <canvas
+    #spectrumCanvas
+    class="spectrum"
+    aria-label="Live spectrum"
+    (pointermove)="onPointerMove($event)"
+    (pointerleave)="onPointerLeave()"
+  ></canvas>
+  <canvas #waterfallCanvas class="waterfall" aria-label="Spectrum over time"></canvas>
+</div>
+
+@if (!running() && framesSeen() === 0) {
+  <p class="muted hint">
+    Press Start. With no receiver attached, run the server with
+    <code>openwave serve --demo</code> and the invented band appears here.
+  </p>
+}
