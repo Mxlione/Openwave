@@ -21,11 +21,17 @@ coverage.xml
 htmlcov/
 
 # OpenWave signal captures (large binary files, never commit)
+#
+# Not a bare "*.ts": that was here for MPEG transport streams, and it silently excluded every
+# TypeScript file in the Angular interface from a commit that claimed to add it. Transport
+# stream captures go in captures/, which is ignored wholesale, and the unambiguous extensions
+# are listed instead.
+captures/
 *.cf32
 *.iq
 *.sigmf-data
-*.ts
-!tests/data/**/*.ts
+*.mpegts
+*.m2ts
 
 # Frontend
 frontend/node_modules/
